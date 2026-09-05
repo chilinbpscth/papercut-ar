@@ -65,6 +65,7 @@ export function createPapercutApp(root) {
   const controls = root.querySelector("#controls")
   const actions = root.querySelector("#actions")
   const hint = root.querySelector("#hint")
+  const tipCard = root.querySelector(".tip-card")
 
   function sectorsFromFolds(folds) { return 2 ** folds }
 
@@ -378,7 +379,7 @@ export function createPapercutApp(root) {
     } else {
       controls.innerHTML = `<div class="row"><h2>成品</h2>
         <span style="color:var(--muted)">${state.sectors} 等份對稱 · 可下載或返回再剪</span></div>`
-      hint.textContent = "拖住成品可以轉角度睇。覺得夠美就可以下載俾學生貼簿。"
+      hint.textContent = "成品會輕輕轉；拖住可以自己轉，又會有輕微立體傾斜。夠美就下載貼簿。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
         <button type="button" class="primary" id="dl">下載圖片</button>`
@@ -585,8 +586,23 @@ export function createPapercutApp(root) {
   view.addEventListener("pointerup", onUp)
   view.addEventListener("pointercancel", onUp)
 
+  let idleSpin = 0
+  function tickIdle() {
+    if (state.step === "result" && !draggingResult) {
+      resultAngle += 0.004
+      const wobble = Math.sin(idleSpin) * 6
+      tiltWrap.style.transform = `perspective(900px) rotateY(${wobble}deg) rotateX(${Math.cos(idleSpin) * 4}deg)`
+      idleSpin += 0.03
+      drawView()
+    }
+    requestAnimationFrame(tickIdle)
+  }
+
   function render() {
     if (state.step !== "result") tiltWrap.style.transform = ""
+    if (tipCard) tipCard.open = state.step === "shape" || state.step === "fold"
+    view.style.cursor = state.step === "result" ? "grab" : "crosshair"
+    tiltWrap.classList.toggle("is-result", state.step === "result")
     renderSteps()
     renderControls()
     drawView()
@@ -595,5 +611,6 @@ export function createPapercutApp(root) {
   state.sectors = sectorsFromFolds(state.folds)
   resetWedge()
   render()
+  requestAnimationFrame(tickIdle)
   return { destroy() { root.innerHTML = "" } }
 }

@@ -100,3 +100,11 @@ header p { margin: 0.25rem 0 1rem; color: var(--muted); }
   transition: transform 0.12s ease-out;
   transform-style: preserve-3d;
 }
+
+.tilt-wrap.is-result {
+  overflow: visible;
+  box-shadow: 0 16px 40px rgba(44, 36, 32, 0.12);
+}
+@media (max-width: 859px) {
+  .stage, .preview-stage { width: min(100%, 420px); }
+}
