@@ -1,0 +1,46 @@
+:root {
+  --bg: #1a1520;
+  --panel: #2a2233;
+  --ink: #fff8f0;
+  --muted: #cbb8d4;
+  --accent: #e85d4c;
+  --ok: #3ecf8e;
+  font-family: "PingFang HK", "Noto Sans TC", "Helvetica Neue", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; min-height: 100%;
+  background: radial-gradient(ellipse at top, #3a2a48, var(--bg));
+  color: var(--ink);
+}
+button {
+  font: inherit; border: none; border-radius: 999px;
+  padding: 0.65rem 1.1rem; cursor: pointer;
+  background: var(--accent); color: #fff; font-weight: 600;
+}
+button.secondary { background: #4a3a58; }
+button.ghost { background: transparent; border: 1px solid #6a5a78; color: var(--ink); }
+button.ok { background: var(--ok); color: #082016; }
+button.active { outline: 2px solid #f0c14a; }
+.app { max-width: 920px; margin: 0 auto; padding: 1rem 1rem 2rem; }
+header h1 { margin: 0; font-size: 1.35rem; }
+header p { margin: 0.25rem 0 1rem; color: var(--muted); }
+.panel {
+  background: #241c2e; border: 1px solid #5a4a68;
+  border-radius: 14px; padding: 1rem;
+}
+.row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; align-items: center; }
+.row h2 { margin: 0; font-size: 0.95rem; color: var(--muted); width: 100%; }
+.stage {
+  position: relative; margin: 0.5rem auto 0.75rem;
+  width: min(100%, 520px); aspect-ratio: 1;
+  background: #120c18; border-radius: 12px; overflow: hidden;
+}
+.stage canvas { width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.hint { color: var(--muted); font-size: 0.9rem; line-height: 1.45; margin: 0.5rem 0 0; }
+.steps { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.85rem; }
+.steps span {
+  padding: 0.3rem 0.7rem; border-radius: 999px;
+  background: #3a2a48; color: var(--muted); font-size: 0.82rem;
+}
+.steps span.on { background: #f0c14a; color: #2a1808; font-weight: 700; }
