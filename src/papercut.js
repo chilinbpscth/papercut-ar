@@ -415,13 +415,15 @@ export function createPapercutApp(root) {
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
         <button type="button" class="secondary" id="cam">相機擺放（簡易）</button>
+        <button type="button" class="secondary" id="share">分享</button>
         <button type="button" class="primary" id="dl">下載圖片</button>`
       actions.querySelector("#back").onclick = () => { state.step = "cut"; state.unfoldT = 1; render() }
       actions.querySelector("#restart").onclick = () => {
         state.step = "shape"; state.shape = "square"; state.folds = 2; state.sectors = 4
+        state.paperTone = "#f7efe2"; PAPER = state.paperTone
         state.unfoldT = 1; resetWedge(); render()
       }
-      actions.querySelector("#dl").onclick = () => {
+      function makePngBlob(cb) {
         const prev = state.unfoldT
         state.unfoldT = 1
         const out = document.createElement("canvas")
@@ -431,10 +433,32 @@ export function createPapercutApp(root) {
         octx.scale(2, 2)
         composeFull(octx)
         state.unfoldT = prev
-        const a = document.createElement("a")
-        a.download = `papercut-${state.shape}-${state.sectors}.png`
-        a.href = out.toDataURL("image/png")
-        a.click()
+        out.toBlob((blob) => cb(blob, out), "image/png")
+      }
+      actions.querySelector("#dl").onclick = () => {
+        makePngBlob((blob, out) => {
+          const a = document.createElement("a")
+          a.download = `papercut-${state.shape}-${state.sectors}.png`
+          a.href = out.toDataURL("image/png")
+          a.click()
+        })
+      }
+      actions.querySelector("#share").onclick = async () => {
+        makePngBlob(async (blob) => {
+          if (!blob) return
+          const file = new File([blob], `papercut-${state.shape}-${state.sectors}.png`, { type: "image/png" })
+          try {
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: "剪紙作品", text: "我嘅對稱剪紙" })
+            } else if (navigator.share) {
+              await navigator.share({ title: "剪紙作品", text: "打開學校剪紙應用睇下：https://chilinbpscth.github.io/papercut-ar/" })
+            } else {
+              hint.textContent = "呢部裝置未支援分享；請用「下載圖片」。"
+            }
+          } catch (err) {
+            if (err && err.name !== "AbortError") hint.textContent = "分享取消或失敗；可以改下載。"
+          }
+        })
       }
       actions.querySelector("#cam").onclick = () => openCameraSticker()
     }
@@ -515,7 +539,7 @@ export function createPapercutApp(root) {
     let rel = a + Math.PI / 2
     while (rel < 0) rel += Math.PI * 2
     while (rel >= Math.PI * 2) rel -= Math.PI * 2
-    return rel <= (Math.PI * 2) / state.sectors + 0.02
+    return rel <= (Math.PI * 2) / state.sectors + 0.06
   }
 
   function stampAt(ctx, p, kind, r) {
@@ -558,10 +582,17 @@ export function createPapercutApp(root) {
       stampAt(wctx, p, state.stamp, Math.max(10, state.brush * 0.7))
       state.last = null
     } else if (state.last) {
+      const mx = (state.last.x + p.x) / 2
+      const my = (state.last.y + p.y) / 2
       wctx.beginPath()
       wctx.moveTo(state.last.x, state.last.y)
-      wctx.lineTo(p.x, p.y)
+      wctx.quadraticCurveTo(state.last.x, state.last.y, mx, my)
+      wctx.quadraticCurveTo(mx, my, p.x, p.y)
       wctx.stroke()
+      // round caps at joints for iPad lag gaps
+      wctx.beginPath()
+      wctx.arc(p.x, p.y, state.brush / 2, 0, Math.PI * 2)
+      wctx.fill()
       state.last = p
     } else {
       wctx.beginPath()
