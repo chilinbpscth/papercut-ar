@@ -94,7 +94,7 @@ export function createPapercutApp(root) {
         b.onclick = () => { state.shape = b.dataset.shape; render() }
       })
       hint.textContent = "方形似傳統窗花；圓形適合團花。"
-      actions.innerHTML = `<button type="button" class="ok" id="next">下一步：摺紙</button>`
+      actions.innerHTML = `<button type="button" class="primary" id="next">下一步：摺紙</button>`
       actions.querySelector("#next").onclick = () => { state.step = "fold"; render() }
     } else if (state.step === "fold") {
       const maxFolds = state.shape === "circle" ? 4 : 3
@@ -109,7 +109,7 @@ export function createPapercutApp(root) {
       })
       hint.textContent = "摺得越多，對稱同重複越多。圓形最多可到 16 等份。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
-        <button type="button" class="ok" id="next">下一步：開始剪</button>`
+        <button type="button" class="primary" id="next">下一步：開始剪</button>`
       actions.querySelector("#back").onclick = () => { state.step = "shape"; render() }
       actions.querySelector("#next").onclick = () => {
         state.sectors = sectorsFromFolds(state.folds)
@@ -140,7 +140,7 @@ export function createPapercutApp(root) {
       })
       hint.textContent = "只喺亮起嗰一格剪。剪走嘅位展開後會變成通花。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
-        <button type="button" class="ok" id="next">預覽成品</button>`
+        <button type="button" class="primary" id="next">預覽成品</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
       actions.querySelector("#next").onclick = () => { state.step = "result"; render() }
     } else {
@@ -148,7 +148,7 @@ export function createPapercutApp(root) {
       hint.textContent = "可以下載圖片，或者返回再剪。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
-        <button type="button" class="ok" id="dl">下載圖片</button>`
+        <button type="button" class="primary" id="dl">下載圖片</button>`
       actions.querySelector("#back").onclick = () => { state.step = "cut"; render() }
       actions.querySelector("#restart").onclick = () => {
         state.step = "shape"; state.shape = "square"; state.folds = 2; state.sectors = 4
