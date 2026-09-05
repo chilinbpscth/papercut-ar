@@ -17,6 +17,7 @@ export function createPapercutApp(root) {
     stamp: "circle", // circle | triangle | diamond
     history: [],
     showLivePreview: true,
+    unfoldT: 1, // 0..1 animated unfold
   }
 
   const wedge = document.createElement("canvas")
@@ -224,17 +225,23 @@ export function createPapercutApp(root) {
     ctx.fillRect(0, 0, SIZE, SIZE)
     const n = state.sectors
     const cx = SIZE / 2, cy = SIZE / 2
-    for (let mirror of [false, true]) {
-      for (let i = 0; i < n; i++) {
+    const u = Math.max(0, Math.min(1, state.unfoldT ?? 1))
+    // u=0: only active sector; u=1: full mirror+rotate
+    const maxI = Math.max(1, Math.round(1 + (n - 1) * u))
+    const doMirror = u > 0.55
+    for (let mirror of (doMirror ? [false, true] : [false])) {
+      for (let i = 0; i < maxI; i++) {
         ctx.save()
         ctx.translate(cx, cy)
-        ctx.rotate((i * Math.PI * 2) / n)
+        ctx.rotate((i * Math.PI * 2) / n * (0.15 + 0.85 * u))
         if (mirror) ctx.scale(-1, 1)
         ctx.translate(-cx, -cy)
+        ctx.globalAlpha = 0.35 + 0.65 * u
         ctx.drawImage(wedge, 0, 0)
         ctx.restore()
       }
     }
+    ctx.globalAlpha = 1
     ctx.restore()
     ctx.strokeStyle = GOLD
     ctx.lineWidth = 3
@@ -375,31 +382,50 @@ export function createPapercutApp(root) {
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">完成：睇大圖</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
-      actions.querySelector("#next").onclick = () => { state.step = "result"; render() }
+      actions.querySelector("#next").onclick = () => {
+        state.step = "result"
+        state.unfoldT = 0
+        render()
+        const t0 = performance.now()
+        const dur = 900
+        const anim = (now) => {
+          if (state.step !== "result") return
+          state.unfoldT = Math.min(1, (now - t0) / dur)
+          drawView()
+          if (state.unfoldT < 1) requestAnimationFrame(anim)
+          else { state.unfoldT = 1; drawView() }
+        }
+        requestAnimationFrame(anim)
+      }
     } else {
       controls.innerHTML = `<div class="row"><h2>成品</h2>
         <span style="color:var(--muted)">${state.sectors} 等份對稱 · 可下載或返回再剪</span></div>`
       hint.textContent = "成品會輕輕轉；拖住可以自己轉，又會有輕微立體傾斜。夠美就下載貼簿。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
+        <button type="button" class="secondary" id="cam">相機擺放</button>
         <button type="button" class="primary" id="dl">下載圖片</button>`
-      actions.querySelector("#back").onclick = () => { state.step = "cut"; render() }
+      actions.querySelector("#back").onclick = () => { state.step = "cut"; state.unfoldT = 1; render() }
       actions.querySelector("#restart").onclick = () => {
         state.step = "shape"; state.shape = "square"; state.folds = 2; state.sectors = 4
-        resetWedge(); render()
+        state.unfoldT = 1; resetWedge(); render()
       }
       actions.querySelector("#dl").onclick = () => {
+        const prev = state.unfoldT
+        state.unfoldT = 1
         const out = document.createElement("canvas")
         out.width = SIZE * 2
         out.height = SIZE * 2
         const octx = out.getContext("2d")
         octx.scale(2, 2)
         composeFull(octx)
+        state.unfoldT = prev
         const a = document.createElement("a")
         a.download = `papercut-${state.shape}-${state.sectors}.png`
         a.href = out.toDataURL("image/png")
         a.click()
       }
+      actions.querySelector("#cam").onclick = () => openCameraSticker()
     }
   }
 
@@ -450,7 +476,7 @@ export function createPapercutApp(root) {
       vctx.closePath()
       vctx.stroke()
       vctx.restore()
-      if (state.showLivePreview) composeFull(pctx)
+      if (state.showLivePreview) { const u = state.unfoldT; state.unfoldT = 1; composeFull(pctx); state.unfoldT = u }
     } else {
       vctx.save()
       vctx.fillStyle = "#efe6d8"
@@ -606,6 +632,111 @@ export function createPapercutApp(root) {
     renderSteps()
     renderControls()
     drawView()
+  }
+
+
+  function openCameraSticker() {
+    let overlay = root.querySelector(".cam-overlay")
+    if (overlay) { overlay.remove() }
+    overlay = document.createElement("div")
+    overlay.className = "cam-overlay"
+    overlay.innerHTML = `
+      <div class="cam-panel">
+        <div class="cam-stage">
+          <video id="camVid" playsinline autoplay muted></video>
+          <canvas id="camHud" width="640" height="480"></canvas>
+        </div>
+        <p class="cam-hint">拖動剪紙擺喺現實景物上；撳放大／縮小。無相機就用下載圖片。</p>
+        <div class="row cam-actions">
+          <button type="button" class="ghost" id="camSmaller">縮小</button>
+          <button type="button" class="ghost" id="camBigger">放大</button>
+          <button type="button" class="secondary" id="camShot">擷圖下載</button>
+          <button type="button" class="primary" id="camClose">關閉</button>
+        </div>
+      </div>`
+    root.querySelector(".app").appendChild(overlay)
+    const video = overlay.querySelector("#camVid")
+    const hud = overlay.querySelector("#camHud")
+    const hctx = hud.getContext("2d")
+    let scale = 0.45
+    let ox = 0.5, oy = 0.5
+    let dragging = false, lx = 0, ly = 0
+    let stream = null
+    const paper = document.createElement("canvas")
+    paper.width = SIZE; paper.height = SIZE
+    const prev = state.unfoldT; state.unfoldT = 1
+    composeFull(paper.getContext("2d"), true)
+    state.unfoldT = prev
+
+    function layout() {
+      const stage = overlay.querySelector(".cam-stage")
+      const w = stage.clientWidth || 640
+      const h = Math.round(w * 0.75)
+      stage.style.height = h + "px"
+      hud.width = w; hud.height = h
+      draw()
+    }
+    function draw() {
+      hctx.clearRect(0, 0, hud.width, hud.height)
+      const s = Math.min(hud.width, hud.height) * scale
+      hctx.drawImage(paper, ox * hud.width - s / 2, oy * hud.height - s / 2, s, s)
+    }
+    function onPointer(e, type) {
+      const rect = hud.getBoundingClientRect()
+      const pt = e.touches ? e.touches[0] : e
+      const x = (pt.clientX - rect.left) / rect.width
+      const y = (pt.clientY - rect.top) / rect.height
+      if (type === "down") { dragging = true; lx = x; ly = y }
+      else if (type === "move" && dragging) {
+        ox += x - lx; oy += y - ly; lx = x; ly = y
+        ox = Math.max(0.1, Math.min(0.9, ox))
+        oy = Math.max(0.1, Math.min(0.9, oy))
+        draw()
+      } else if (type === "up") dragging = false
+    }
+    hud.addEventListener("pointerdown", (e) => { e.preventDefault(); onPointer(e, "down") })
+    hud.addEventListener("pointermove", (e) => onPointer(e, "move"))
+    hud.addEventListener("pointerup", () => onPointer({}, "up"))
+    overlay.querySelector("#camBigger").onclick = () => { scale = Math.min(0.9, scale + 0.08); draw() }
+    overlay.querySelector("#camSmaller").onclick = () => { scale = Math.max(0.2, scale - 0.08); draw() }
+    overlay.querySelector("#camShot").onclick = () => {
+      const out = document.createElement("canvas")
+      out.width = hud.width; out.height = hud.height
+      const o = out.getContext("2d")
+      o.drawImage(video, 0, 0, out.width, out.height)
+      o.drawImage(hud, 0, 0)
+      const a = document.createElement("a")
+      a.download = `papercut-cam-${Date.now()}.png`
+      a.href = out.toDataURL("image/png")
+      a.click()
+    }
+    const close = () => {
+      if (stream) stream.getTracks().forEach((tr) => tr.stop())
+      overlay.remove()
+    }
+    overlay.querySelector("#camClose").onclick = close
+
+    const tryCam = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false,
+        })
+        video.srcObject = stream
+        await video.play()
+        layout()
+        window.addEventListener("resize", layout, { once: false })
+        overlay._onResize = layout
+      } catch (err) {
+        overlay.querySelector(".cam-hint").textContent =
+          "開唔到相機（權限或裝置唔支援）。可以用「下載圖片」再喺相簿疊圖。"
+        video.style.display = "none"
+        hud.style.background = "#2c2420"
+        layout()
+        draw()
+      }
+    }
+    tryCam()
   }
 
   state.sectors = sectorsFromFolds(state.folds)

@@ -108,3 +108,30 @@ header p { margin: 0.25rem 0 1rem; color: var(--muted); }
 @media (max-width: 859px) {
   .stage, .preview-stage { width: min(100%, 420px); }
 }
+
+button { min-height: 44px; }
+.cam-overlay {
+  position: fixed; inset: 0; z-index: 40;
+  background: rgba(44,36,32,0.72);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+}
+.cam-panel {
+  width: min(100%, 720px);
+  background: var(--panel);
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  padding: 0.75rem;
+  box-shadow: var(--shadow);
+}
+.cam-stage {
+  position: relative; width: 100%; border-radius: 12px; overflow: hidden;
+  background: #111; min-height: 240px;
+}
+.cam-stage video, .cam-stage #camHud {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; display: block;
+}
+.cam-stage #camHud { pointer-events: auto; touch-action: none; }
+.cam-hint { color: var(--muted); font-size: 0.88rem; margin: 0.5rem 0; }
+.cam-actions { margin-bottom: 0; }
