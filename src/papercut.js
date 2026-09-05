@@ -29,14 +29,23 @@ export function createPapercutApp(root) {
         <h1>剪紙 · 對稱創作</h1>
         <p>一格剪完，對稱展開成窗花／團花——比真紙更易重試</p>
       </header>
+      <details class="tip-card" open>
+        <summary>課堂 5 分鐘點用</summary>
+        <ol>
+          <li>選圓形或方形</li>
+          <li>摺 2～3 次（夠對稱又唔難）</li>
+          <li>喺亮格剪，或撳「花瓣／齒邊／星點」示範</li>
+          <li>睇右邊即時展開，滿意就下載貼簿</li>
+        </ol>
+      </details>
       <div class="panel">
         <div class="steps" id="steps"></div>
         <div id="controls"></div>
         <div class="stage-row" id="stageRow">
-          <div class="stage"><canvas id="view" width="${SIZE}" height="${SIZE}" aria-label="剪紙畫布"></canvas></div>
+          <div class="stage tilt-wrap" id="tiltWrap"><canvas id="view" width="${SIZE}" height="${SIZE}" role="img" aria-label="剪紙畫布"></canvas></div>
           <div class="stage preview-stage hidden" id="previewWrap">
             <div class="preview-label">即時展開</div>
-            <canvas id="preview" width="${SIZE}" height="${SIZE}" aria-label="展開預覽"></canvas>
+            <canvas id="preview" width="${SIZE}" height="${SIZE}" role="img" aria-label="展開預覽"></canvas>
           </div>
         </div>
         <p class="hint" id="hint"></p>
@@ -48,6 +57,7 @@ export function createPapercutApp(root) {
   const view = root.querySelector("#view")
   const preview = root.querySelector("#preview")
   const previewWrap = root.querySelector("#previewWrap")
+  const tiltWrap = root.querySelector("#tiltWrap")
   const vctx = view.getContext("2d")
   const pctx = preview.getContext("2d")
   const stepsEl = root.querySelector("#steps")
@@ -308,9 +318,15 @@ export function createPapercutApp(root) {
         resetWedge(); render()
       }
       actions.querySelector("#dl").onclick = () => {
+        const out = document.createElement("canvas")
+        out.width = SIZE * 2
+        out.height = SIZE * 2
+        const octx = out.getContext("2d")
+        octx.scale(2, 2)
+        composeFull(octx)
         const a = document.createElement("a")
         a.download = `papercut-${state.shape}-${state.sectors}.png`
-        a.href = view.toDataURL("image/png")
+        a.href = out.toDataURL("image/png")
         a.click()
       }
     }
@@ -444,9 +460,14 @@ export function createPapercutApp(root) {
   }
   function onMove(e) {
     if (draggingResult && state.step === "result") {
-      const x = (e.touches ? e.touches[0] : e).clientX
+      const pt = e.touches ? e.touches[0] : e
+      const x = pt.clientX
       resultAngle += (x - dragLastX) * 0.01
       dragLastX = x
+      const rect = tiltWrap.getBoundingClientRect()
+      const nx = ((pt.clientX - rect.left) / rect.width) * 2 - 1
+      const ny = ((pt.clientY - rect.top) / rect.height) * 2 - 1
+      tiltWrap.style.transform = `perspective(900px) rotateY(${nx * 12}deg) rotateX(${-ny * 10}deg)`
       drawView()
       return
     }
@@ -458,6 +479,7 @@ export function createPapercutApp(root) {
     state.drawing = false
     state.last = null
     draggingResult = false
+    if (state.step !== "result") tiltWrap.style.transform = ""
   }
 
   view.addEventListener("pointerdown", onDown)
@@ -466,6 +488,7 @@ export function createPapercutApp(root) {
   view.addEventListener("pointercancel", onUp)
 
   function render() {
+    if (state.step !== "result") tiltWrap.style.transform = ""
     renderSteps()
     renderControls()
     drawView()

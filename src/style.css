@@ -8,10 +8,14 @@
   --muted: #6b5e55;
   --line: #e8d9c8;
   --accent: #c41e3a;
+  --accent-2: #d4a017;
   --gold: #d4a017;
+  --focus: #193826;
+  --panel-soft: #efe4d4;
   --ok: #0f766e;
   --cta-deep: #193826;
   --radius: 14px;
+  --shadow: 0 8px 24px rgba(44, 36, 32, 0.06);
   font-family: "Noto Sans TC", "PingFang HK", "Helvetica Neue", sans-serif;
 }
 * { box-sizing: border-box; }
@@ -29,8 +33,8 @@ button.secondary { background: #efe4d4; color: var(--ink); }
 button.ghost { background: transparent; border: 1px solid var(--line); color: var(--ink); }
 button.primary { background: var(--accent); color: #fff; }
 button.ok { background: var(--ok); color: #fff; }
-button:focus-visible { outline: 3px solid #193826; outline-offset: 2px; }
-a:focus-visible { outline: 3px solid #193826; outline-offset: 2px; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+[data-app="papercut"] { --accent: #c41e3a; --accent-2: #d4a017; }
 button.active { outline: 2px solid var(--gold); outline-offset: 2px; }
 .app { max-width: 920px; margin: 0 auto; padding: 1rem 1rem 2rem; }
 header h1 { margin: 0; font-size: 1.35rem; }
@@ -71,3 +75,28 @@ header p { margin: 0.25rem 0 1rem; color: var(--muted); }
   padding: 0.2rem 0.65rem; font-size: 0.78rem; font-weight: 600;
 }
 .hidden { display: none !important; }
+
+.tip-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.65rem 1rem;
+  margin-bottom: 0.85rem;
+  box-shadow: var(--shadow, 0 8px 24px rgba(44,36,32,0.06));
+}
+.tip-card summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--accent);
+}
+.tip-card ol {
+  margin: 0.5rem 0 0.25rem 1.2rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+.tilt-wrap {
+  transition: transform 0.12s ease-out;
+  transform-style: preserve-3d;
+}
