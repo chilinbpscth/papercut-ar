@@ -58,3 +58,16 @@ header p { margin: 0.25rem 0 1rem; color: var(--muted); }
   background: #efe4d4; color: var(--muted); font-size: 0.82rem;
 }
 .steps span.on { background: var(--gold); color: #2c2420; font-weight: 700; }
+
+.stage-row { display: grid; gap: 0.75rem; }
+@media (min-width: 860px) {
+  .stage-row { grid-template-columns: 1fr 1fr; align-items: start; }
+}
+.preview-stage { position: relative; }
+.preview-label {
+  position: absolute; top: 0.5rem; left: 0.5rem; z-index: 2;
+  background: rgba(255,250,243,0.92); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 999px;
+  padding: 0.2rem 0.65rem; font-size: 0.78rem; font-weight: 600;
+}
+.hidden { display: none !important; }
