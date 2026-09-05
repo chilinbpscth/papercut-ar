@@ -164,11 +164,11 @@ export function createPapercutApp(root) {
   }
 
   function drawFoldGuide(ctx) {
-    ctx.fillStyle = "#120c18"
+    ctx.fillStyle = "#efe6d8"
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.save()
     clipPaper(ctx)
-    ctx.fillStyle = "#3a3048"
+    ctx.fillStyle = "#e8d9c8"
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.restore()
     ctx.save()
@@ -178,7 +178,7 @@ export function createPapercutApp(root) {
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.restore()
     const n = state.sectors, cx = SIZE / 2, cy = SIZE / 2
-    ctx.strokeStyle = "rgba(240,193,74,0.55)"
+    ctx.strokeStyle = "rgba(212,160,23,0.65)"
     ctx.lineWidth = 2
     for (let i = 0; i < n; i++) {
       const a = -Math.PI / 2 + (i * Math.PI * 2) / n
@@ -187,7 +187,7 @@ export function createPapercutApp(root) {
       ctx.lineTo(cx + Math.cos(a) * SIZE, cy + Math.sin(a) * SIZE)
       ctx.stroke()
     }
-    ctx.strokeStyle = "#f97316"
+    ctx.strokeStyle = "#d4a017"
     ctx.lineWidth = 3
     ctx.beginPath()
     if (state.shape === "circle") ctx.arc(cx, cy, SIZE * 0.46, 0, Math.PI * 2)
@@ -199,11 +199,11 @@ export function createPapercutApp(root) {
   }
 
   function composeFull(ctx) {
-    ctx.fillStyle = "#120c18"
+    ctx.fillStyle = "#efe6d8"
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.save()
     clipPaper(ctx)
-    ctx.fillStyle = "#2a2038"
+    ctx.fillStyle = "#e8d9c8"
     ctx.fillRect(0, 0, SIZE, SIZE)
     const n = state.sectors, cx = SIZE / 2, cy = SIZE / 2
     for (let i = 0; i < n; i++) {
@@ -215,7 +215,7 @@ export function createPapercutApp(root) {
       ctx.restore()
     }
     ctx.restore()
-    ctx.strokeStyle = "#f97316"
+    ctx.strokeStyle = "#d4a017"
     ctx.lineWidth = 3
     ctx.beginPath()
     if (state.shape === "circle") ctx.arc(SIZE / 2, SIZE / 2, SIZE * 0.46, 0, Math.PI * 2)
@@ -228,10 +228,10 @@ export function createPapercutApp(root) {
 
   function drawView() {
     if (state.step === "shape") {
-      vctx.fillStyle = "#120c18"
+      vctx.fillStyle = "#efe6d8"
       vctx.fillRect(0, 0, SIZE, SIZE)
       vctx.fillStyle = "#f7efe2"
-      vctx.strokeStyle = "#f97316"
+      vctx.strokeStyle = "#d4a017"
       vctx.lineWidth = 4
       if (state.shape === "circle") {
         vctx.beginPath(); vctx.arc(SIZE/2, SIZE/2, SIZE*0.36, 0, Math.PI*2); vctx.fill(); vctx.stroke()
