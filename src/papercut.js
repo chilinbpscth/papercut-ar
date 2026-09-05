@@ -13,7 +13,8 @@ export function createPapercutApp(root) {
     drawing: false,
     last: null,
     brush: 22,
-    mode: "cut",
+    mode: "cut", // cut | restore | stamp
+    stamp: "circle", // circle | triangle | diamond
     history: [],
     showLivePreview: true,
   }
@@ -34,7 +35,7 @@ export function createPapercutApp(root) {
         <ol>
           <li>選圓形或方形</li>
           <li>摺 2～3 次（夠對稱又唔難）</li>
-          <li>喺亮格剪，或撳「花瓣／齒邊／星點」示範</li>
+          <li>喺亮格剪／印章打窿，或撳示範圖案</li>
           <li>睇右邊即時展開，滿意就下載貼簿</li>
         </ol>
       </details>
@@ -141,7 +142,7 @@ export function createPapercutApp(root) {
         wctx.lineTo(x + Math.sin(mid) * 28, y - Math.cos(mid) * 28)
         wctx.stroke()
       }
-    } else { // star notches near rim
+    } else if (kind === "star") { // star notches near rim
       wctx.lineWidth = 14
       const a0 = -Math.PI / 2
       const a1 = a0 + (Math.PI * 2) / n
@@ -153,6 +154,51 @@ export function createPapercutApp(root) {
         wctx.arc(x, y, 12 + (i % 2) * 6, 0, Math.PI * 2)
         wctx.fill()
       }
+    } else if (kind === "heart") {
+      const hx = cx + rx * SIZE * 0.28
+      const hy = cy + ry * SIZE * 0.28
+      const s = SIZE * 0.055
+      wctx.beginPath()
+      wctx.moveTo(hx, hy + s * 0.9)
+      wctx.bezierCurveTo(hx - s * 1.4, hy - s * 0.1, hx - s * 0.55, hy - s * 1.15, hx, hy - s * 0.35)
+      wctx.bezierCurveTo(hx + s * 0.55, hy - s * 1.15, hx + s * 1.4, hy - s * 0.1, hx, hy + s * 0.9)
+      wctx.fill()
+      wctx.beginPath()
+      wctx.arc(cx + rx * SIZE * 0.14, cy + ry * SIZE * 0.14, 8, 0, Math.PI * 2)
+      wctx.fill()
+    } else if (kind === "lattice") {
+      wctx.lineWidth = 12
+      for (let i = 0; i < 3; i++) {
+        const tt = 0.22 + i * 0.12
+        const x0 = cx + Math.cos(mid - 0.18) * SIZE * tt
+        const y0 = cy + Math.sin(mid - 0.18) * SIZE * tt
+        const x1 = cx + Math.cos(mid + 0.18) * SIZE * tt
+        const y1 = cy + Math.sin(mid + 0.18) * SIZE * tt
+        wctx.beginPath()
+        wctx.moveTo(x0, y0)
+        wctx.lineTo(x1, y1)
+        wctx.stroke()
+      }
+      wctx.lineWidth = 18
+      wctx.beginPath()
+      wctx.arc(cx, cy, SIZE * 0.38, mid - 0.22, mid + 0.22)
+      wctx.stroke()
+    } else if (kind === "snow") {
+      wctx.beginPath()
+      wctx.arc(cx + rx * SIZE * 0.12, cy + ry * SIZE * 0.12, 10, 0, Math.PI * 2)
+      wctx.fill()
+      for (let i = 0; i < 3; i++) {
+        const d = SIZE * (0.22 + i * 0.09)
+        const x = cx + rx * d, y = cy + ry * d
+        const s = 10 + i * 2
+        wctx.beginPath()
+        wctx.moveTo(x, y - s)
+        wctx.lineTo(x + s * 0.7, y)
+        wctx.lineTo(x, y + s)
+        wctx.lineTo(x - s * 0.7, y)
+        wctx.closePath()
+        wctx.fill()
+      }
     }
     wctx.restore()
   }
@@ -160,6 +206,16 @@ export function createPapercutApp(root) {
   function composeFull(ctx, withShadow = true) {
     ctx.fillStyle = "#efe6d8"
     ctx.fillRect(0, 0, SIZE, SIZE)
+    if (withShadow) {
+      ctx.save()
+      clipPaper(ctx)
+      ctx.shadowColor = "rgba(44,36,32,0.28)"
+      ctx.shadowBlur = 18
+      ctx.shadowOffsetY = 6
+      ctx.fillStyle = TABLE
+      ctx.fillRect(0, 0, SIZE, SIZE)
+      ctx.restore()
+    }
     // table under paper so cuts read as holes
     ctx.save()
     clipPaper(ctx)
@@ -273,18 +329,26 @@ export function createPapercutApp(root) {
     } else if (state.step === "cut") {
       controls.innerHTML = `<div class="row"><h2>工具</h2>
         <button type="button" id="cutBtn" class="${state.mode==="cut"?"primary":"ghost"}">剪刀</button>
+        <button type="button" id="stampBtn" class="${state.mode==="stamp"?"primary":"ghost"}">印章</button>
         <button type="button" id="restBtn" class="${state.mode==="restore"?"primary":"ghost"}">補紙</button>
         <button type="button" class="ghost" id="undo">復原</button>
         <button type="button" class="ghost" id="clear">清空</button></div>
-        <div class="row"><h2>筆粗</h2>
+        <div class="row"><h2>筆粗／印章</h2>
         <button type="button" class="ghost" data-b="12">細</button>
         <button type="button" class="ghost" data-b="22">中</button>
-        <button type="button" class="ghost" data-b="34">大</button></div>
+        <button type="button" class="ghost" data-b="34">大</button>
+        <button type="button" class="ghost" data-stamp="circle">圓孔</button>
+        <button type="button" class="ghost" data-stamp="triangle">三角</button>
+        <button type="button" class="ghost" data-stamp="diamond">菱形</button></div>
         <div class="row"><h2>示範圖案</h2>
         <button type="button" class="secondary" data-demo="petal">花瓣</button>
         <button type="button" class="secondary" data-demo="edge">齒邊</button>
-        <button type="button" class="secondary" data-demo="star">星點</button></div>`
+        <button type="button" class="secondary" data-demo="star">星點</button>
+        <button type="button" class="secondary" data-demo="heart">心形</button>
+        <button type="button" class="secondary" data-demo="lattice">窗格</button>
+        <button type="button" class="secondary" data-demo="snow">雪花</button></div>`
       controls.querySelector("#cutBtn").onclick = () => { state.mode = "cut"; renderControls(); drawView() }
+      controls.querySelector("#stampBtn").onclick = () => { state.mode = "stamp"; renderControls(); drawView() }
       controls.querySelector("#restBtn").onclick = () => { state.mode = "restore"; renderControls(); drawView() }
       controls.querySelector("#undo").onclick = () => {
         const prev = state.history.pop(); if (!prev) return
@@ -294,13 +358,19 @@ export function createPapercutApp(root) {
       }
       controls.querySelector("#clear").onclick = () => { snapshot(); resetWedge(); drawView() }
       controls.querySelectorAll("[data-b]").forEach((b) => {
-        b.onclick = () => { state.brush = Number(b.dataset.b); renderControls() }
-        if (Number(b.dataset.b) === state.brush) b.classList.add("active")
+        b.onclick = () => { state.brush = Number(b.dataset.b); if (state.mode === "stamp") state.mode = "cut"; renderControls() }
+        if (Number(b.dataset.b) === state.brush && state.mode !== "stamp") b.classList.add("active")
+      })
+      controls.querySelectorAll("[data-stamp]").forEach((b) => {
+        b.onclick = () => { state.stamp = b.dataset.stamp; state.mode = "stamp"; renderControls() }
+        if (state.mode === "stamp" && b.dataset.stamp === state.stamp) b.classList.add("active")
       })
       controls.querySelectorAll("[data-demo]").forEach((b) => {
         b.onclick = () => { applyDemoPattern(b.dataset.demo); drawView() }
       })
-      hint.textContent = "只喺最亮嗰格剪；啡色底＝剪走嘅窿。右邊會即時睇展開效果。"
+      hint.textContent = state.mode === "stamp"
+        ? "印章模式：喺亮格撳一下打窿（圓／三角／菱）。右邊即時睇對稱。"
+        : "只喺最亮嗰格剪；啡色底＝剪走嘅窿。右邊會即時睇展開效果。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">完成：睇大圖</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
@@ -410,7 +480,26 @@ export function createPapercutApp(root) {
     return rel <= (Math.PI * 2) / state.sectors + 0.02
   }
 
-  function paintAt(p) {
+  function stampAt(ctx, p, kind, r) {
+    ctx.beginPath()
+    if (kind === "triangle") {
+      ctx.moveTo(p.x, p.y - r)
+      ctx.lineTo(p.x + r * 0.9, p.y + r * 0.75)
+      ctx.lineTo(p.x - r * 0.9, p.y + r * 0.75)
+      ctx.closePath()
+    } else if (kind === "diamond") {
+      ctx.moveTo(p.x, p.y - r)
+      ctx.lineTo(p.x + r * 0.75, p.y)
+      ctx.lineTo(p.x, p.y + r)
+      ctx.lineTo(p.x - r * 0.75, p.y)
+      ctx.closePath()
+    } else {
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+    }
+    ctx.fill()
+  }
+
+  function paintAt(p, { stampOnce = false } = {}) {
     if (!inActiveSector(p.x, p.y)) { state.last = null; return }
     wctx.save()
     clipSector(wctx, state.sectors)
@@ -418,27 +507,31 @@ export function createPapercutApp(root) {
     wctx.lineCap = "round"
     wctx.lineJoin = "round"
     wctx.lineWidth = state.brush
-    if (state.mode === "cut") {
-      wctx.globalCompositeOperation = "destination-out"
-      wctx.strokeStyle = "#000"
-      wctx.fillStyle = "#000"
-    } else {
+    if (state.mode === "restore") {
       wctx.globalCompositeOperation = "source-over"
       wctx.strokeStyle = PAPER
       wctx.fillStyle = PAPER
+    } else {
+      wctx.globalCompositeOperation = "destination-out"
+      wctx.strokeStyle = "#000"
+      wctx.fillStyle = "#000"
     }
-    if (state.last) {
+    if (state.mode === "stamp" || stampOnce) {
+      stampAt(wctx, p, state.stamp, Math.max(10, state.brush * 0.7))
+      state.last = null
+    } else if (state.last) {
       wctx.beginPath()
       wctx.moveTo(state.last.x, state.last.y)
       wctx.lineTo(p.x, p.y)
       wctx.stroke()
+      state.last = p
     } else {
       wctx.beginPath()
       wctx.arc(p.x, p.y, state.brush / 2, 0, Math.PI * 2)
       wctx.fill()
+      state.last = p
     }
     wctx.restore()
-    state.last = p
     drawView()
   }
 
@@ -454,8 +547,13 @@ export function createPapercutApp(root) {
       try { view.setPointerCapture(e.pointerId) } catch (_) {}
     }
     snapshot()
-    state.drawing = true
     state.last = null
+    if (state.mode === "stamp") {
+      state.drawing = false
+      paintAt(pointerPos(e), { stampOnce: true })
+      return
+    }
+    state.drawing = true
     paintAt(pointerPos(e))
   }
   function onMove(e) {
@@ -471,7 +569,7 @@ export function createPapercutApp(root) {
       drawView()
       return
     }
-    if (!state.drawing || state.step !== "cut") return
+    if (!state.drawing || state.step !== "cut" || state.mode === "stamp") return
     e.preventDefault()
     paintAt(pointerPos(e))
   }
