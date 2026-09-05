@@ -1,5 +1,5 @@
 const SIZE = 640
-const PAPER = "#f7efe2"
+let PAPER = "#f7efe2"
 const TABLE = "#c4a574" // shows through cuts
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
@@ -18,6 +18,7 @@ export function createPapercutApp(root) {
     history: [],
     showLivePreview: true,
     unfoldT: 1, // 0..1 animated unfold
+    paperTone: "#f7efe2",
   }
 
   const wedge = document.createElement("canvas")
@@ -93,6 +94,7 @@ export function createPapercutApp(root) {
   }
 
   function resetWedge() {
+    PAPER = state.paperTone || "#f7efe2"
     wctx.clearRect(0, 0, SIZE, SIZE)
     wctx.save()
     clipSector(wctx, state.sectors)
@@ -308,11 +310,20 @@ export function createPapercutApp(root) {
     if (state.step === "shape") {
       controls.innerHTML = `<div class="row"><h2>紙形</h2>
         <button type="button" data-shape="square" class="secondary ${state.shape==="square"?"active":""}">方形（窗花）</button>
-        <button type="button" data-shape="circle" class="secondary ${state.shape==="circle"?"active":""}">圓形（團花）</button></div>`
+        <button type="button" data-shape="circle" class="secondary ${state.shape==="circle"?"active":""}">圓形（團花）</button></div>
+        <div class="row"><h2>紙色</h2>
+        <button type="button" class="ghost tone" data-tone="#f7efe2" style="background:#f7efe2;color:#2c2420">宣紙</button>
+        <button type="button" class="ghost tone" data-tone="#fff8e7" style="background:#fff8e7;color:#2c2420">米黄</button>
+        <button type="button" class="ghost tone" data-tone="#f3d9de" style="background:#f3d9de;color:#2c2420">淡粉</button>
+        <button type="button" class="ghost tone" data-tone="#dceee6" style="background:#dceee6;color:#2c2420">淡青</button></div>`
       controls.querySelectorAll("[data-shape]").forEach((b) => {
         b.onclick = () => { state.shape = b.dataset.shape; render() }
       })
-      hint.textContent = "方形似窗花；圓形似團花。之後可以隨便重試，唔使驚剪壞。"
+      controls.querySelectorAll("[data-tone]").forEach((b) => {
+        b.onclick = () => { state.paperTone = b.dataset.tone; PAPER = state.paperTone; render() }
+        if (b.dataset.tone === state.paperTone) b.classList.add("active")
+      })
+      hint.textContent = "方形似窗花；圓形似團花。紙色之後剪窿會更易睇。"
       actions.innerHTML = `<button type="button" class="primary" id="next">下一步：摺紙</button>`
       actions.querySelector("#next").onclick = () => { state.step = "fold"; render() }
     } else if (state.step === "fold") {
@@ -380,7 +391,7 @@ export function createPapercutApp(root) {
         ? "印章模式：喺亮格撳一下打窿（圓／三角／菱）。右邊即時睇對稱。"
         : "只喺最亮嗰格剪；啡色底＝剪走嘅窿。右邊會即時睇展開效果。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
-        <button type="button" class="primary" id="next">完成：睇大圖</button>`
+        <button type="button" class="primary" id="next">完成：展開睇效果</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
       actions.querySelector("#next").onclick = () => {
         state.step = "result"
@@ -403,7 +414,7 @@ export function createPapercutApp(root) {
       hint.textContent = "成品會輕輕轉；拖住可以自己轉，又會有輕微立體傾斜。夠美就下載貼簿。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
-        <button type="button" class="secondary" id="cam">相機擺放</button>
+        <button type="button" class="secondary" id="cam">相機擺放（簡易）</button>
         <button type="button" class="primary" id="dl">下載圖片</button>`
       actions.querySelector("#back").onclick = () => { state.step = "cut"; state.unfoldT = 1; render() }
       actions.querySelector("#restart").onclick = () => {
