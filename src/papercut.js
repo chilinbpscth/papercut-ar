@@ -3,7 +3,7 @@ let PAPER = "#c41e3a"
 const TABLE = "#fff4e8" // window light through cuts (not muddy desk)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-heavy2"
+const APP_VERSION = "v20260906-wedge"
 
 export function createPapercutApp(root) {
   const state = {
@@ -101,6 +101,145 @@ export function createPapercutApp(root) {
     else ctx.arc(cx, cy, SIZE, a0, a0 - (Math.PI * 2) / n, true)
     ctx.closePath()
     ctx.clip()
+  }
+
+  function cutViewParams() {
+    const n = state.sectors
+    const theta = (Math.PI * 2) / n
+    const mid = -Math.PI / 2 + theta / 2
+    const tipX = SIZE * 0.5
+    const tipY = SIZE * 0.82
+    const paperR = SIZE * 0.46
+    // enlarge so paperR ~0.46*SIZE reads as ~0.72*SIZE on screen
+    const scale = (SIZE * 0.72) / paperR
+    return { n, theta, mid, tipX, tipY, scale, paperR }
+  }
+
+  function applyCutViewTransform(ctx) {
+    const { tipX, tipY, mid, scale } = cutViewParams()
+    ctx.translate(tipX, tipY)
+    ctx.rotate(-Math.PI / 2 - mid)
+    ctx.scale(scale, scale)
+    ctx.translate(-SIZE / 2, -SIZE / 2)
+  }
+
+  function viewToWedge(p) {
+    const { tipX, tipY, mid, scale } = cutViewParams()
+    let x = p.x - tipX
+    let y = p.y - tipY
+    // inverse of rotate(-PI/2 - mid)
+    const ang = Math.PI / 2 + mid
+    const c = Math.cos(ang), s = Math.sin(ang)
+    const rx = x * c - y * s
+    const ry = x * s + y * c
+    return { x: rx / scale + SIZE / 2, y: ry / scale + SIZE / 2 }
+  }
+
+  function drawFoldedWedgeView(ctx) {
+    const { n, theta, mid, tipX, tipY, scale, paperR } = cutViewParams()
+    const a0 = -Math.PI / 2
+    const a1 = a0 + theta
+    const cx = SIZE / 2, cy = SIZE / 2
+
+    ctx.fillStyle = "#efe6d8"
+    ctx.fillRect(0, 0, SIZE, SIZE)
+
+    // stacked muted layers (thickness under the fold pile)
+    const layers = [
+      { dx: 14, dy: 10, fill: "#cbb89a" },
+      { dx: 9, dy: 6, fill: "#d9c8aa" },
+      { dx: 5, dy: 3, fill: "#e4d6bc" },
+    ]
+    for (const L of layers) {
+      ctx.save()
+      ctx.translate(tipX + L.dx, tipY + L.dy)
+      ctx.rotate(-Math.PI / 2 - mid)
+      ctx.scale(scale, scale)
+      ctx.translate(-cx, -cy)
+      ctx.beginPath()
+      ctx.moveTo(cx, cy)
+      ctx.arc(cx, cy, paperR, a0, a1)
+      ctx.closePath()
+      ctx.fillStyle = L.fill
+      ctx.fill()
+      ctx.restore()
+    }
+
+    // soft drop shadow for the top wedge
+    ctx.save()
+    applyCutViewTransform(ctx)
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.arc(cx, cy, paperR, a0, a1)
+    ctx.closePath()
+    ctx.shadowColor = "rgba(44,36,32,0.38)"
+    ctx.shadowBlur = 24
+    ctx.shadowOffsetX = 6
+    ctx.shadowOffsetY = 14
+    ctx.fillStyle = "rgba(44,36,32,0.22)"
+    ctx.fill()
+    ctx.restore()
+
+    // TABLE under holes, then the actual wedge bitmap
+    ctx.save()
+    applyCutViewTransform(ctx)
+    ctx.save()
+    clipSector(ctx, n)
+    clipPaper(ctx)
+    ctx.fillStyle = TABLE
+    ctx.fillRect(0, 0, SIZE, SIZE)
+    ctx.drawImage(wedge, 0, 0)
+    ctx.restore()
+
+    // dashed fold edges (a0 / a1)
+    ctx.strokeStyle = "rgba(44,36,32,0.78)"
+    ctx.lineWidth = 2.4 / scale
+    ctx.setLineDash([11 / scale, 8 / scale])
+    ctx.lineCap = "round"
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.lineTo(cx + Math.cos(a0) * paperR, cy + Math.sin(a0) * paperR)
+    ctx.moveTo(cx, cy)
+    ctx.lineTo(cx + Math.cos(a1) * paperR, cy + Math.sin(a1) * paperR)
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // soft outer arc (rim)
+    ctx.strokeStyle = "rgba(44,36,32,0.3)"
+    ctx.lineWidth = 1.6 / scale
+    ctx.beginPath()
+    ctx.arc(cx, cy, paperR, a0, a1)
+    ctx.stroke()
+    ctx.restore()
+
+    // N-layer chip top-right
+    const chip = `${n} 層`
+    ctx.font = "600 17px system-ui, -apple-system, sans-serif"
+    ctx.textAlign = "right"
+    ctx.textBaseline = "middle"
+    const tw = ctx.measureText(chip).width
+    const chipR = SIZE - 16
+    const chipY = 28
+    const padX = 12
+    const x0 = chipR - tw - padX
+    const y0 = chipY - 12
+    const ww = tw + padX * 2
+    const hh = 24
+    ctx.fillStyle = "rgba(255,248,240,0.92)"
+    ctx.strokeStyle = "rgba(196,160,100,0.55)"
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    const rr = 12
+    ctx.moveTo(x0 + rr, y0)
+    ctx.arcTo(x0 + ww, y0, x0 + ww, y0 + hh, rr)
+    ctx.arcTo(x0 + ww, y0 + hh, x0, y0 + hh, rr)
+    ctx.arcTo(x0, y0 + hh, x0, y0, rr)
+    ctx.arcTo(x0, y0, x0 + ww, y0, rr)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = "#5a4638"
+    ctx.fillText(chip, chipR, chipY)
   }
 
   function resetWedge() {
@@ -405,8 +544,8 @@ export function createPapercutApp(root) {
         b.onclick = () => { applyDemoPattern(b.dataset.demo); drawView() }
       })
       hint.textContent = state.mode === "stamp"
-        ? "喺亮格撳一下打窿。左下角小窗即時按摺數鋪滿成圈（幾何複製，唔係評分）。"
-        : "亮格係摺起嗰一叠。圍成圈放手＝豆／葉形窿；輕輕一劃＝剪一刀。左下角係按摺痕複製，同亮格睇落唔同係正常，唔係 AI 判定。"
+        ? "喺扇形一叠撳一下打窿。虛線係摺邊；畫面係摺起嗰一叠扇形。左下角小窗即時展開。"
+        : "虛線係摺邊；畫面係摺起嗰一叠扇形。圍成圈放手＝豆／葉形窿；輕輕一劃＝剪一刀。左下角係展開預覽（幾何複製，唔係評分）。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">預覽成品</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
@@ -510,27 +649,12 @@ export function createPapercutApp(root) {
       vctx.fillRect(0, 0, SIZE, SIZE)
       vctx.restore()
     } else if (state.step === "cut") {
-      drawFoldGuide(vctx)
-      vctx.save()
-      clipSector(vctx, state.sectors)
-      clipPaper(vctx)
-      vctx.drawImage(wedge, 0, 0)
-      vctx.restore()
-      // highlight active sector outline
-      vctx.save()
-      const cx = SIZE/2, cy = SIZE/2, n = state.sectors
-      const a0 = -Math.PI/2, a1 = a0 + (Math.PI*2)/n
-      vctx.strokeStyle = VERMILION
-      vctx.lineWidth = 3
-      vctx.beginPath()
-      vctx.moveTo(cx, cy)
-      vctx.arc(cx, cy, SIZE*0.46, a0, a1)
-      vctx.closePath()
-      vctx.stroke()
-      vctx.restore()
-      // dashed live stroke + ghost of the hole that will punch on release
+      drawFoldedWedgeView(vctx)
+      // live stroke in wedge coords -> cut view transform
       if (state.strokePts && state.strokePts.length > 1) {
+        const { scale } = cutViewParams()
         vctx.save()
+        applyCutViewTransform(vctx)
         clipSector(vctx, state.sectors)
         clipPaper(vctx)
         const pts = state.strokePts
@@ -545,8 +669,8 @@ export function createPapercutApp(root) {
           vctx.fill()
         }
         vctx.strokeStyle = "rgba(44,36,32,0.85)"
-        vctx.lineWidth = 3
-        vctx.setLineDash([8, 6])
+        vctx.lineWidth = 3 / scale
+        vctx.setLineDash([8 / scale, 6 / scale])
         vctx.lineCap = "round"
         vctx.lineJoin = "round"
         vctx.beginPath()
@@ -576,10 +700,13 @@ export function createPapercutApp(root) {
   function pointerPos(e, el = view) {
     const rect = el.getBoundingClientRect()
     const src = e.touches ? e.touches[0] : e
-    return {
+    const p = {
       x: ((src.clientX - rect.left) / rect.width) * SIZE,
       y: ((src.clientY - rect.top) / rect.height) * SIZE,
     }
+    // cut workspace is a transformed wedge; map screen -> wedge buffer
+    if (state.step === "cut") return viewToWedge(p)
+    return p
   }
 
   function inActiveSector(x, y) {
