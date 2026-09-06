@@ -3,7 +3,7 @@ let PAPER = "#c41e3a"
 const TABLE = "#fff4e8" // light window through cuts (dark/vermilion paper)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-ux"
+const APP_VERSION = "v20260906-class"
 /** Hole-through fill under cuts: light paper needs dark desk so holes read. */
 function holeFill() {
   const hex = String(PAPER || "#c41e3a").replace("#", "").trim()
@@ -422,15 +422,21 @@ export function createPapercutApp(root) {
   }
 
   function drawFoldGuide(ctx) {
+    // Same radial-sector language for circle AND square: rays from center,
+    // one dark active wedge (= 之後剪呢格), light inactive wedges.
+    const n = state.sectors, cx = SIZE / 2, cy = SIZE / 2
+    const paperR = SIZE * 0.46
     ctx.fillStyle = "#efe6d8"
     ctx.fillRect(0, 0, SIZE, SIZE)
+
+    // light paper base (inactive look)
     ctx.save()
     clipPaper(ctx)
-    ctx.fillStyle = holeFill()
+    ctx.fillStyle = "#f4ebe0"
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.restore()
-    // inactive sectors: stacked muted paper so the bright cell reads as the folded pile
-    const n = state.sectors, cx = SIZE / 2, cy = SIZE / 2
+
+    // inactive sectors: soft rice-paper wedges
     for (let i = 1; i < n; i++) {
       ctx.save()
       ctx.translate(cx, cy)
@@ -439,14 +445,30 @@ export function createPapercutApp(root) {
       ctx.save()
       clipSector(ctx, n)
       clipPaper(ctx)
-      ctx.fillStyle = i % 2 ? "#e2d2be" : "#eadcc8"
+      ctx.fillStyle = i % 2 ? "#efe4d4" : "#f7efe2"
       ctx.fillRect(0, 0, SIZE, SIZE)
       ctx.restore()
       ctx.restore()
     }
-    // fold rays
-    ctx.strokeStyle = "rgba(212,160,23,0.7)"
-    ctx.lineWidth = 2
+
+    // active sector 0: dark / strong vermilion — "之後剪呢格"
+    ctx.save()
+    clipSector(ctx, n)
+    clipPaper(ctx)
+    // prefer strong vermilion/ink for the active wedge so light paper tones still read dark=cut
+    const tone = String(PAPER || VERMILION).toLowerCase()
+    const lumGuess = (tone === "#efe6d4" || tone === "#f3e4c8" || tone === "#f3d9de" || tone === "#dceee6" || tone === "#f7efe2")
+    ctx.fillStyle = lumGuess ? VERMILION : PAPER
+    ctx.fillRect(0, 0, SIZE, SIZE)
+    ctx.fillStyle = lumGuess ? "rgba(44,36,32,0.18)" : "rgba(44,36,32,0.28)"
+    ctx.fillRect(0, 0, SIZE, SIZE)
+    ctx.restore()
+
+    // fold rays from center (square uses same pie language as circle)
+    ctx.save()
+    clipPaper(ctx)
+    ctx.strokeStyle = "rgba(212,160,23,0.85)"
+    ctx.lineWidth = 2.2
     for (let i = 0; i < n; i++) {
       const a = -Math.PI / 2 + (i * Math.PI * 2) / n
       ctx.beginPath()
@@ -454,15 +476,70 @@ export function createPapercutApp(root) {
       ctx.lineTo(cx + Math.cos(a) * SIZE, cy + Math.sin(a) * SIZE)
       ctx.stroke()
     }
+    ctx.restore()
+
+    // outline
     ctx.strokeStyle = GOLD
     ctx.lineWidth = 3
     ctx.beginPath()
-    if (state.shape === "circle") ctx.arc(cx, cy, SIZE * 0.46, 0, Math.PI * 2)
+    if (state.shape === "circle") ctx.arc(cx, cy, paperR, 0, Math.PI * 2)
     else {
       const m = SIZE * 0.08
       ctx.rect(m, m, SIZE - m * 2, SIZE - m * 2)
     }
     ctx.stroke()
+
+    // label on active wedge midpoint
+    const mid = -Math.PI / 2 + Math.PI / n
+    const lx = cx + Math.cos(mid) * paperR * 0.55
+    const ly = cy + Math.sin(mid) * paperR * 0.55
+    ctx.save()
+    ctx.font = "700 18px \"Noto Sans TC\", \"PingFang HK\", sans-serif"
+    ctx.textAlign = "center"
+    ctx.textBaseline = "middle"
+    const label = "之後剪呢格"
+    const tw = ctx.measureText(label).width
+    const pad = 10
+    ctx.fillStyle = "rgba(255,250,243,0.94)"
+    ctx.strokeStyle = "rgba(196,30,58,0.55)"
+    ctx.lineWidth = 1.5
+    const bw = tw + pad * 2, bh = 28
+    const bx = lx - bw / 2, by = ly - bh / 2
+    ctx.beginPath()
+    const rr = 14
+    ctx.moveTo(bx + rr, by)
+    ctx.arcTo(bx + bw, by, bx + bw, by + bh, rr)
+    ctx.arcTo(bx + bw, by + bh, bx, by + bh, rr)
+    ctx.arcTo(bx, by + bh, bx, by, rr)
+    ctx.arcTo(bx, by, bx + bw, by, rr)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = "#2c2420"
+    ctx.fillText(label, lx, ly)
+    ctx.restore()
+
+    // legend chip
+    ctx.font = "600 13px \"Noto Sans TC\", \"PingFang HK\", sans-serif"
+    ctx.textAlign = "left"
+    ctx.textBaseline = "middle"
+    ctx.fillStyle = "rgba(255,248,240,0.92)"
+    ctx.strokeStyle = "rgba(196,160,100,0.5)"
+    ctx.lineWidth = 1
+    const legend = "深色＝剪 · 淺色＝摺埋"
+    const lw = ctx.measureText(legend).width
+    const x0 = 14, y0 = SIZE - 36, ww = lw + 20, hh = 24
+    ctx.beginPath()
+    ctx.moveTo(x0 + 10, y0)
+    ctx.arcTo(x0 + ww, y0, x0 + ww, y0 + hh, 10)
+    ctx.arcTo(x0 + ww, y0 + hh, x0, y0 + hh, 10)
+    ctx.arcTo(x0, y0 + hh, x0, y0, 10)
+    ctx.arcTo(x0, y0, x0 + ww, y0, 10)
+    ctx.closePath()
+    ctx.fill()
+    ctx.stroke()
+    ctx.fillStyle = "#5a4638"
+    ctx.fillText(legend, x0 + 10, y0 + hh / 2)
   }
 
   function renderSteps() {
@@ -503,7 +580,7 @@ export function createPapercutApp(root) {
       controls.querySelectorAll("[data-f]").forEach((b) => {
         b.onclick = () => { state.folds = Number(b.dataset.f); state.sectors = sectorsFromFolds(state.folds); render() }
       })
-      hint.textContent = "建議先試「摺 2～3 次」：夠對稱又唔難剪。摺越多，圖案越密。"
+      hint.textContent = "深色扇形＝之後剪呢格（摺起嗰一叠）；淺色＝摺埋嘅部分。建議先試「摺 2～3 次」。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">下一步：開始剪</button>`
       actions.querySelector("#back").onclick = () => { state.step = "shape"; render() }
@@ -514,12 +591,9 @@ export function createPapercutApp(root) {
     } else if (state.step === "cut") {
       state.mode = "cut"
       state.symmetryMode = "alt-mirror"
-      controls.innerHTML = `<div class="row"><h2>工具</h2>
-        <button type="button" id="cutBtn" class="primary">剪刀</button></div>
-        <div class="row">
+      controls.innerHTML = `<div class="row cut-actions" id="cutActions">
         <button type="button" class="ghost" id="undo">復原</button>
         <button type="button" class="ghost" id="clear">重新再來</button></div>`
-      controls.querySelector("#cutBtn").onclick = () => { state.mode = "cut"; renderControls(); drawView() }
       controls.querySelector("#undo").onclick = () => {
         const prev = state.history.pop(); if (!prev) return
         const img = new Image()
@@ -527,7 +601,7 @@ export function createPapercutApp(root) {
         img.src = prev
       }
       controls.querySelector("#clear").onclick = () => { snapshot(); resetWedge(); drawView() }
-      hint.textContent = "虛線係摺邊；畫面係摺起嗰一叠扇形。圍成圈放手＝豆／葉形窿；輕輕一劃＝剪一刀。左下角係展開預覽（幾何複製，唔係評分）。"
+      hint.textContent = "虛線係摺邊；畫面係摺起嗰一叠扇形。要圍成密封圖形先剪得走（豆／葉形窿）；尖角剪過兩條摺邊會整塊尖角飛走。左下角係展開預覽。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">預覽成品</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
@@ -623,13 +697,6 @@ export function createPapercutApp(root) {
     } else if (state.step === "fold") {
       state.sectors = sectorsFromFolds(state.folds)
       drawFoldGuide(vctx)
-      // show empty active sector paper
-      vctx.save()
-      clipSector(vctx, state.sectors)
-      clipPaper(vctx)
-      vctx.fillStyle = PAPER
-      vctx.fillRect(0, 0, SIZE, SIZE)
-      vctx.restore()
     } else if (state.step === "cut") {
       drawFoldedWedgeView(vctx)
       // live stroke in wedge coords -> cut view transform
@@ -642,24 +709,40 @@ export function createPapercutApp(root) {
         const pts = state.strokePts
         const first = pts[0], last = pts[pts.length - 1]
         const dist = Math.hypot(last.x - first.x, last.y - first.y)
-        if (pts.length >= 6 && dist < 48) {
-          vctx.fillStyle = "rgba(44,36,32,0.16)"
+        const len = pathLength(pts)
+        const nearLoop = dist < Math.max(24, 0.22 * len) && pts.length >= 6
+        // only show fill ghost when near-closed; open line is NOT a valid cut
+        if (nearLoop) {
+          vctx.fillStyle = "rgba(44,36,32,0.18)"
           vctx.beginPath()
           vctx.moveTo(first.x, first.y)
           for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
           vctx.closePath()
           vctx.fill()
+          vctx.strokeStyle = "rgba(44,36,32,0.85)"
+          vctx.lineWidth = 3 / scale
+          vctx.setLineDash([8 / scale, 6 / scale])
+          vctx.lineCap = "round"
+          vctx.lineJoin = "round"
+          vctx.beginPath()
+          vctx.moveTo(pts[0].x, pts[0].y)
+          for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
+          vctx.closePath()
+          vctx.stroke()
+          vctx.setLineDash([])
+        } else {
+          // faint guide only — not emphasized as a valid open cut
+          vctx.strokeStyle = "rgba(44,36,32,0.35)"
+          vctx.lineWidth = 2 / scale
+          vctx.setLineDash([6 / scale, 8 / scale])
+          vctx.lineCap = "round"
+          vctx.lineJoin = "round"
+          vctx.beginPath()
+          vctx.moveTo(pts[0].x, pts[0].y)
+          for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
+          vctx.stroke()
+          vctx.setLineDash([])
         }
-        vctx.strokeStyle = "rgba(44,36,32,0.85)"
-        vctx.lineWidth = 3 / scale
-        vctx.setLineDash([8 / scale, 6 / scale])
-        vctx.lineCap = "round"
-        vctx.lineJoin = "round"
-        vctx.beginPath()
-        vctx.moveTo(pts[0].x, pts[0].y)
-        for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
-        vctx.stroke()
-        vctx.setLineDash([])
         vctx.restore()
       }
       if (state.showLivePreview) {
@@ -744,13 +827,85 @@ export function createPapercutApp(root) {
     return len
   }
 
+  function distToRay(p, angle, cx, cy) {
+    const dx = p.x - cx, dy = p.y - cy
+    const along = dx * Math.cos(angle) + dy * Math.sin(angle)
+    if (along < 0) return Math.hypot(dx, dy)
+    const px = Math.cos(angle) * along
+    const py = Math.sin(angle) * along
+    return Math.hypot(dx - px, dy - py)
+  }
+
+  function pointInPoly(px, py, poly) {
+    // ray-cast; poly is [{x,y}, ...]
+    let inside = false
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i].x, yi = poly[i].y
+      const xj = poly[j].x, yj = poly[j].y
+      const intersect = ((yi > py) !== (yj > py)) &&
+        (px < ((xj - xi) * (py - yi)) / ((yj - yi) || 1e-9) + xi)
+      if (intersect) inside = !inside
+    }
+    return inside
+  }
+
+  function pathCrossesBothRays(pts, a0, a1, cx, cy, rayTol) {
+    let hit0 = false, hit1 = false
+    for (const p of pts) {
+      if (distToRay(p, a0, cx, cy) < rayTol) hit0 = true
+      if (distToRay(p, a1, cx, cy) < rayTol) hit1 = true
+      if (hit0 && hit1) return true
+    }
+    return false
+  }
+
+  function isTipChopChord(pts, a0, a1, cx, cy) {
+    if (!pts || pts.length < 2) return false
+    const first = pts[0], last = pts[pts.length - 1]
+    const rayTol = 28
+    const d0f = distToRay(first, a0, cx, cy)
+    const d1f = distToRay(first, a1, cx, cy)
+    const d0l = distToRay(last, a0, cx, cy)
+    const d1l = distToRay(last, a1, cx, cy)
+    const endsOnOpposite =
+      (d0f < rayTol && d1l < rayTol) || (d1f < rayTol && d0l < rayTol)
+    if (!endsOnOpposite) return false
+    // path should stay somewhat near the tip (尖角) — not a distant rim chord
+    let minR = Infinity
+    for (const p of pts) {
+      const r = Math.hypot(p.x - cx, p.y - cy)
+      if (r < minR) minR = r
+    }
+    return minR < SIZE * 0.42
+  }
+
+  function flashSealHint() {
+    const prev = hint.textContent
+    hint.textContent = "要圍成密封圖形先剪得走"
+    hint.classList.add("hint-flash")
+    clearTimeout(flashSealHint._t)
+    flashSealHint._t = setTimeout(() => {
+      hint.classList.remove("hint-flash")
+      if (state.step === "cut") {
+        hint.textContent = "虛線係摺邊；畫面係摺起嗰一叠扇形。要圍成密封圖形先剪得走（豆／葉形窿）；尖角剪過兩條摺邊會整塊尖角飛走。左下角係展開預覽。"
+      } else {
+        hint.textContent = prev
+      }
+    }, 1600)
+  }
+
   function commitClosedCut(pts) {
     if (!pts || pts.length < 2) return
     const first = pts[0], last = pts[pts.length - 1]
     const dist = Math.hypot(last.x - first.x, last.y - first.y)
     const len = pathLength(pts)
+    const cx = SIZE / 2, cy = SIZE / 2
+    const n = state.sectors
+    const a0 = -Math.PI / 2
+    const a1 = a0 + (Math.PI * 2) / n
+
+    // small tap punch OK
     if (len < 16 && dist < 16) {
-      // accidental tap → small punch, matches "打窿" classroom feel
       snapshot()
       wctx.save()
       clipSector(wctx, state.sectors)
@@ -763,7 +918,16 @@ export function createPapercutApp(root) {
       wctx.restore()
       return
     }
+
     const nearLoop = dist < Math.max(24, 0.22 * len) && pts.length >= 6
+    const tipChop = isTipChopChord(pts, a0, a1, cx, cy)
+
+    // REJECT open strokes / thin seams — only sealed shapes
+    if (!nearLoop && !tipChop) {
+      flashSealHint()
+      return
+    }
+
     snapshot()
     wctx.save()
     clipSector(wctx, state.sectors)
@@ -773,23 +937,41 @@ export function createPapercutApp(root) {
     wctx.strokeStyle = "#000"
     wctx.lineCap = "round"
     wctx.lineJoin = "round"
-    if (nearLoop || (pts.length >= 3 && dist < 36)) {
-      // POC feel: release a loop → smooth bean/leaf hole
-      let path = pts.slice()
-      if (dist > 8) path.push({ x: first.x, y: first.y })
-      path = smoothClosePath(path)
+
+    // tip-chop chord (fold→fold, not self-closed): remove WHOLE tip piece
+    if (tipChop && !nearLoop) {
+      wctx.beginPath()
+      wctx.moveTo(cx, cy)
+      for (let i = 0; i < pts.length; i++) wctx.lineTo(pts[i].x, pts[i].y)
+      wctx.closePath()
+      wctx.fill()
+      wctx.restore()
+      return
+    }
+
+    // near-closed loop → smooth bean/leaf hole (or tip sector if tip involved)
+    let path = pts.slice()
+    if (dist > 8) path.push({ x: first.x, y: first.y })
+    path = smoothClosePath(path)
+
+    const containsTip = pointInPoly(cx, cy, path)
+    const crossesFolds = pathCrossesBothRays(pts, a0, a1, cx, cy, 26)
+    const tipInvolved = containsTip || tipChop || (crossesFolds && isTipChopChord(pts, a0, a1, cx, cy))
+
+    if (tipInvolved) {
+      // classroom scissors: tip cut across → whole tip piece gone
+      wctx.beginPath()
+      wctx.moveTo(cx, cy)
+      for (let i = 0; i < path.length; i++) wctx.lineTo(path[i].x, path[i].y)
+      wctx.closePath()
+      wctx.fill()
+    } else {
+      // normal leaf/bean hole away from tip
       wctx.beginPath()
       wctx.moveTo(path[0].x, path[0].y)
       for (let i = 1; i < path.length; i++) wctx.lineTo(path[i].x, path[i].y)
       wctx.closePath()
       wctx.fill()
-    } else {
-      // open scratch → thin seam only (jianzhi language, not marker pen)
-      wctx.lineWidth = 5
-      wctx.beginPath()
-      wctx.moveTo(pts[0].x, pts[0].y)
-      for (let i = 1; i < pts.length; i++) wctx.lineTo(pts[i].x, pts[i].y)
-      wctx.stroke()
     }
     wctx.restore()
   }
