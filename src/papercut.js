@@ -1,9 +1,9 @@
 const SIZE = 640
-let PAPER = "#f7efe2"
-const TABLE = "#c4a574" // shows through cuts
+let PAPER = "#c41e3a"
+const TABLE = "#fff4e8" // window light through cuts (not muddy desk)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-heavy"
+const APP_VERSION = "v20260906-heavy2"
 
 export function createPapercutApp(root) {
   const state = {
@@ -15,12 +15,12 @@ export function createPapercutApp(root) {
     last: null,
     brush: 22,
     mode: "cut", // cut | restore | stamp
-    stamp: "circle", // circle | triangle | diamond
+    stamp: "circle", // circle | crescent | teardrop
     strokePts: [], // live path for closed cutout
     history: [],
     showLivePreview: true,
     unfoldT: 1, // 0..1 animated unfold
-    paperTone: "#f7efe2",
+    paperTone: "#c41e3a",
     symmetryMode: "alt-mirror", // alt-mirror | rotate
   }
 
@@ -34,7 +34,7 @@ export function createPapercutApp(root) {
       <header class="app-header">
         <div>
           <h1>剪紙 · 對稱創作</h1>
-          <p>一格剪完，按摺痕幾何展開成窗花／團花——唔係 AI 評分</p>
+          <p>摺邊留紙橋再剪窿；展開係幾何對稱——唔係 AI 評分</p>
         </div>
         <span class="ver-chip" title="硬 refresh 後應見到呢個版號">${APP_VERSION}</span>
       </header>
@@ -146,7 +146,7 @@ export function createPapercutApp(root) {
         wctx.fill()
       }
     } else if (kind === "edge") {
-      wctx.lineWidth = 16
+      wctx.lineWidth = 5
       for (let i = 0; i < 4; i++) {
         const t = 0.35 + i * 0.12
         const x = cx + Math.cos(mid) * SIZE * t
@@ -157,7 +157,7 @@ export function createPapercutApp(root) {
         wctx.stroke()
       }
     } else if (kind === "star") { // star notches near rim
-      wctx.lineWidth = 14
+      wctx.lineWidth = 5
       const a0 = -Math.PI / 2
       const a1 = a0 + (Math.PI * 2) / n
       for (let i = 0; i < 5; i++) {
@@ -181,7 +181,7 @@ export function createPapercutApp(root) {
       wctx.arc(cx + rx * SIZE * 0.14, cy + ry * SIZE * 0.14, 8, 0, Math.PI * 2)
       wctx.fill()
     } else if (kind === "lattice") {
-      wctx.lineWidth = 12
+      wctx.lineWidth = 5
       for (let i = 0; i < 3; i++) {
         const tt = 0.22 + i * 0.12
         const x0 = cx + Math.cos(mid - 0.18) * SIZE * tt
@@ -193,7 +193,7 @@ export function createPapercutApp(root) {
         wctx.lineTo(x1, y1)
         wctx.stroke()
       }
-      wctx.lineWidth = 18
+      wctx.lineWidth = 6
       wctx.beginPath()
       wctx.arc(cx, cy, SIZE * 0.38, mid - 0.22, mid + 0.22)
       wctx.stroke()
@@ -327,6 +327,7 @@ export function createPapercutApp(root) {
         <button type="button" data-shape="square" class="secondary ${state.shape==="square"?"active":""}">方形（窗花）</button>
         <button type="button" data-shape="circle" class="secondary ${state.shape==="circle"?"active":""}">圓形（團花）</button></div>
         <div class="row"><h2>紙色</h2>
+        <button type="button" class="ghost tone" data-tone="#c41e3a" style="background:#c41e3a;color:#fff">硃紅</button>
         <button type="button" class="ghost tone" data-tone="#f7efe2" style="background:#f7efe2;color:#2c2420">宣紙</button>
         <button type="button" class="ghost tone" data-tone="#fff8e7" style="background:#fff8e7;color:#2c2420">米黄</button>
         <button type="button" class="ghost tone" data-tone="#f3d9de" style="background:#f3d9de;color:#2c2420">淡粉</button>
@@ -364,20 +365,18 @@ export function createPapercutApp(root) {
       const altOn = state.symmetryMode !== "rotate"
       controls.innerHTML = `<div class="row"><h2>工具</h2>
         <button type="button" id="cutBtn" class="${state.mode==="cut"?"primary":"ghost"}">剪刀</button>
+        <button type="button" id="stampBtn" class="${state.mode==="stamp"?"primary":"ghost"}">印章</button>
+        <button type="button" class="ghost" data-stamp="circle">圓孔</button>
+        <button type="button" class="ghost" data-stamp="crescent">月牙</button>
+        <button type="button" class="ghost" data-stamp="teardrop">水滴</button>
         <button type="button" class="ghost" id="undo">復原</button>
         <button type="button" class="ghost" id="clear">全部重來</button></div>
         <div class="row"><h2>對稱</h2>
         <button type="button" id="symAlt" class="${altOn?"primary":"ghost"}">交替鏡射（似真摺紙）</button>
-        <button type="button" id="symRot" class="${!altOn?"primary":"ghost"}">淨旋轉（疏啲）</button></div>
+        <button type="button" id="symRot" class="${!altOn?"primary":"ghost"}">淨旋轉（疎啲）</button></div>
         <details class="more-tools">
-          <summary>更多工具（印章／示範）</summary>
+          <summary>示範圖案</summary>
           <div class="row" style="margin-top:0.5rem">
-            <button type="button" id="stampBtn" class="${state.mode==="stamp"?"primary":"ghost"}">印章</button>
-            <button type="button" class="ghost" data-stamp="circle">圓孔</button>
-            <button type="button" class="ghost" data-stamp="triangle">三角</button>
-            <button type="button" class="ghost" data-stamp="diamond">菱形</button>
-          </div>
-          <div class="row">
             <button type="button" class="secondary" data-demo="petal">花瓣</button>
             <button type="button" class="secondary" data-demo="edge">齒邊</button>
             <button type="button" class="secondary" data-demo="star">星點</button>
@@ -438,7 +437,7 @@ export function createPapercutApp(root) {
       actions.querySelector("#back").onclick = () => { state.step = "cut"; state.unfoldT = 1; render() }
       actions.querySelector("#restart").onclick = () => {
         state.step = "shape"; state.shape = "square"; state.folds = 2; state.sectors = 4
-        state.paperTone = "#f7efe2"; PAPER = state.paperTone
+        state.paperTone = "#c41e3a"; PAPER = state.paperTone
         state.unfoldT = 1; resetWedge(); render()
       }
       function makePngBlob(cb) {
@@ -593,17 +592,18 @@ export function createPapercutApp(root) {
   }
 
   function stampAt(ctx, p, kind, r) {
+    if (kind === "crescent" || kind === "triangle") {
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
+      ctx.arc(p.x + r * 0.38, p.y - r * 0.08, r * 0.7, 0, Math.PI * 2, true)
+      ctx.fill("evenodd")
+      return
+    }
     ctx.beginPath()
-    if (kind === "triangle") {
+    if (kind === "teardrop" || kind === "diamond") {
       ctx.moveTo(p.x, p.y - r)
-      ctx.lineTo(p.x + r * 0.9, p.y + r * 0.75)
-      ctx.lineTo(p.x - r * 0.9, p.y + r * 0.75)
-      ctx.closePath()
-    } else if (kind === "diamond") {
-      ctx.moveTo(p.x, p.y - r)
-      ctx.lineTo(p.x + r * 0.75, p.y)
-      ctx.lineTo(p.x, p.y + r)
-      ctx.lineTo(p.x - r * 0.75, p.y)
+      ctx.bezierCurveTo(p.x + r * 0.9, p.y - r * 0.2, p.x + r * 0.55, p.y + r * 0.7, p.x, p.y + r)
+      ctx.bezierCurveTo(p.x - r * 0.55, p.y + r * 0.7, p.x - r * 0.9, p.y - r * 0.2, p.x, p.y - r)
       ctx.closePath()
     } else {
       ctx.arc(p.x, p.y, r, 0, Math.PI * 2)
@@ -675,8 +675,8 @@ export function createPapercutApp(root) {
       wctx.closePath()
       wctx.fill()
     } else {
-      // open scratch → thick knife cut, do NOT fill a giant triangle
-      wctx.lineWidth = Math.max(16, state.brush)
+      // open scratch → thin seam only (jianzhi language, not marker pen)
+      wctx.lineWidth = 5
       wctx.beginPath()
       wctx.moveTo(pts[0].x, pts[0].y)
       for (let i = 1; i < pts.length; i++) wctx.lineTo(pts[i].x, pts[i].y)
