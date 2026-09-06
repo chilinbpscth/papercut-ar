@@ -65,6 +65,10 @@ header p { margin: 0.25rem 0 1rem; color: var(--muted); }
   color: var(--ink);
   font-weight: 700;
 }
+.row.cut-actions button.primary {
+  background: var(--accent);
+  color: #fff;
+}
 .stage {
   position: relative; margin: 0.5rem auto 0.75rem;
   width: min(100%, 520px); aspect-ratio: 1;

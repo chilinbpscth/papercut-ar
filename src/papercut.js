@@ -3,7 +3,7 @@ let PAPER = "#c41e3a"
 const TABLE = "#fff4e8" // light window through cuts (dark/vermilion paper)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-class2"
+const APP_VERSION = "v20260906-knife"
 /** Hole-through fill under cuts: light paper needs dark desk so holes read. */
 function holeFill() {
   const hex = String(PAPER || "#c41e3a").replace("#", "").trim()
@@ -27,7 +27,8 @@ export function createPapercutApp(root) {
     brush: 22,
     mode: "cut", // cut | restore | stamp
     stamp: "circle", // circle | crescent | teardrop
-    strokePts: [], // live path for closed cutout
+    strokePts: [], // current knife stroke while drawing
+    cutEdges: [], // completed knife strokes (each an array of points)
     history: [],
     showLivePreview: true,
     unfoldT: 1, // 0..1 animated unfold
@@ -54,7 +55,7 @@ export function createPapercutApp(root) {
         <ol>
           <li>選圓形或方形</li>
           <li>摺 2～3 次（夠對稱又唔難）</li>
-          <li>喺扇形一叠圍一圈放手＝封閉剪口</li>
+          <li>一刀一刀劃；連成密封再撳「確認剪口」</li>
           <li>左下角睇小「展開」，再撳「預覽成品」</li>
           <li>展開睇落會密好多、同單格唔一樣——呢個就係摺紙對稱，電腦冇改你剪嘅形</li>
         </ol>
@@ -183,16 +184,37 @@ export function createPapercutApp(root) {
     return { x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d }
   }
 
+  /** Fit packetPoly bbox into canvas after mid-up rotate; ~9% pad all sides. */
   function cutViewParams() {
     const n = state.sectors
     const theta = (Math.PI * 2) / n
     const mid = -Math.PI / 2 + theta / 2
-    const tipX = SIZE * 0.5
-    const tipY = SIZE * 0.82
     const paperR = SIZE * 0.46
-    // enlarge so paperR ~0.46*SIZE reads as ~0.72*SIZE on screen
-    const scale = (SIZE * 0.72) / paperR
-    return { n, theta, mid, tipX, tipY, scale, paperR }
+    const cx = SIZE / 2, cy = SIZE / 2
+    const rot = -Math.PI / 2 - mid
+    const c = Math.cos(rot), s = Math.sin(rot)
+    const pack = packetPoly()
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const p of pack) {
+      const dx = p.x - cx, dy = p.y - cy
+      const rx = dx * c - dy * s
+      const ry = dx * s + dy * c
+      if (rx < minX) minX = rx
+      if (ry < minY) minY = ry
+      if (rx > maxX) maxX = rx
+      if (ry > maxY) maxY = ry
+    }
+    const bw = Math.max(1e-6, maxX - minX)
+    const bh = Math.max(1e-6, maxY - minY)
+    const pad = 0.09
+    const avail = SIZE * (1 - 2 * pad)
+    const scale = Math.min(avail / bw, avail / bh)
+    // tipX/tipY = where wedge origin (cx,cy) lands; centers rotated bbox in view
+    const midRx = (minX + maxX) / 2
+    const midRy = (minY + maxY) / 2
+    const tipX = SIZE / 2 - midRx * scale
+    const tipY = SIZE / 2 - midRy * scale
+    return { n, theta, mid, tipX, tipY, scale, paperR, rot }
   }
 
   function applyCutViewTransform(ctx) {
@@ -679,22 +701,42 @@ export function createPapercutApp(root) {
       actions.querySelector("#back").onclick = () => { state.step = "shape"; render() }
       actions.querySelector("#next").onclick = () => {
         state.sectors = sectorsFromFolds(state.folds)
+        state.cutEdges = []
+        state.strokePts = []
         resetWedge(); state.step = "cut"; render()
       }
     } else if (state.step === "cut") {
       state.mode = "cut"
       state.symmetryMode = "alt-mirror"
+      const confirmBtn = state.cutEdges.length >= 1
+        ? `<button type="button" class="primary" id="confirmCut">確認剪口</button>`
+        : ""
       controls.innerHTML = `<div class="row cut-actions" id="cutActions">
         <button type="button" class="ghost" id="undo">復原</button>
-        <button type="button" class="ghost" id="clear">重新再來</button></div>`
+        <button type="button" class="ghost" id="clear">重新再來</button>${confirmBtn}</div>`
       controls.querySelector("#undo").onclick = () => {
+        if (state.cutEdges.length) {
+          state.cutEdges.pop()
+          syncCutActions()
+          drawView()
+          return
+        }
         const prev = state.history.pop(); if (!prev) return
         const img = new Image()
         img.onload = () => { wctx.clearRect(0,0,SIZE,SIZE); wctx.drawImage(img,0,0); drawView() }
         img.src = prev
       }
-      controls.querySelector("#clear").onclick = () => { snapshot(); resetWedge(); drawView() }
-      hint.textContent = "虛線係摺邊；畫面係摺起嗰一叠扇形。要圍成密封圖形先剪得走（豆／葉形窿）；尖角剪過兩條摺邊會整塊尖角飛走。左下角係展開預覽。"
+      controls.querySelector("#clear").onclick = () => {
+        state.cutEdges = []
+        state.strokePts = []
+        snapshot()
+        resetWedge()
+        syncCutActions()
+        drawView()
+      }
+      const conf = controls.querySelector("#confirmCut")
+      if (conf) conf.onclick = () => confirmCutEdges()
+      hint.textContent = CUT_HINT
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">預覽成品</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
@@ -726,6 +768,7 @@ export function createPapercutApp(root) {
       actions.querySelector("#restart").onclick = () => {
         state.step = "shape"; state.shape = "square"; state.folds = 2; state.sectors = 4
         state.paperTone = "#c41e3a"; PAPER = state.paperTone
+        state.cutEdges = []; state.strokePts = []
         state.unfoldT = 1; resetWedge(); render()
       }
       function makePngBlob(cb) {
@@ -796,48 +839,63 @@ export function createPapercutApp(root) {
       drawFoldGuide(vctx)
     } else if (state.step === "cut") {
       drawFoldedWedgeView(vctx)
-      // live stroke in wedge coords -> cut view transform
-      if (state.strokePts && state.strokePts.length > 1) {
+      // knife strokes: completed edges solid + live stroke dashed (+ seal / tip ghost)
+      {
         const { scale } = cutViewParams()
-        vctx.save()
-        applyCutViewTransform(vctx)
-        clipPacket(vctx)
-        clipPaper(vctx)
-        const pts = state.strokePts
-        const first = pts[0], last = pts[pts.length - 1]
-        const dist = Math.hypot(last.x - first.x, last.y - first.y)
-        const len = pathLength(pts)
-        const nearLoop = dist < Math.max(24, 0.22 * len) && pts.length >= 6
-        const tipGhost = isTipChopStroke(pts)
-        vctx.lineCap = "round"
-        vctx.lineJoin = "round"
-        if (nearLoop || tipGhost) {
-          vctx.fillStyle = "rgba(44,36,32,0.22)"
-          if (tipGhost && !nearLoop) {
-            const g = tipChopPolygon(pts)
-            if (g) { drawPoly(vctx, g); vctx.fill() }
-          } else {
-            vctx.beginPath()
-            vctx.moveTo(pts[0].x, pts[0].y)
-            for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
-            vctx.closePath()
+        const live = state.strokePts || []
+        const edges = state.cutEdges || []
+        const hasLive = live.length > 1
+        const hasEdges = edges.some((e) => e && e.length > 1)
+        if (hasLive || hasEdges) {
+          vctx.save()
+          applyCutViewTransform(vctx)
+          clipPacket(vctx)
+          clipPaper(vctx)
+          vctx.lineCap = "round"
+          vctx.lineJoin = "round"
+
+          // ghost of region that will fall out when chain nearly / fully seals
+          const ghostPoly = sealGhostPolygon(edges, hasLive ? live : null)
+          const tipGhost = hasLive && isTipChopStroke(live)
+          if (ghostPoly && ghostPoly.length >= 3) {
+            vctx.fillStyle = "rgba(44,36,32,0.22)"
+            drawPoly(vctx, ghostPoly)
             vctx.fill()
+          } else if (tipGhost) {
+            const g = tipChopPolygon(live)
+            if (g) {
+              vctx.fillStyle = "rgba(44,36,32,0.22)"
+              drawPoly(vctx, g)
+              vctx.fill()
+            }
           }
-          vctx.strokeStyle = "rgba(44,36,32,0.85)"
-          vctx.lineWidth = 3 / scale
-          vctx.setLineDash([8 / scale, 6 / scale])
-          drawPoly(vctx, tipGhost && !nearLoop ? (tipChopPolygon(pts) || pts) : pts, !!nearLoop || tipGhost)
-          vctx.stroke()
+
+          // completed knife edges — solid dark lines
+          vctx.strokeStyle = "rgba(44,36,32,0.88)"
+          vctx.lineWidth = 2.8 / scale
           vctx.setLineDash([])
-        } else {
-          vctx.strokeStyle = "rgba(44,36,32,0.35)"
-          vctx.lineWidth = 2 / scale
-          vctx.setLineDash([6 / scale, 8 / scale])
-          drawPoly(vctx, pts, false)
-          vctx.stroke()
-          vctx.setLineDash([])
+          for (const e of edges) {
+            if (!e || e.length < 2) continue
+            drawPoly(vctx, e, false)
+            vctx.stroke()
+          }
+
+          // current stroke — dashed
+          if (hasLive) {
+            vctx.strokeStyle = tipGhost ? "rgba(44,36,32,0.85)" : "rgba(44,36,32,0.55)"
+            vctx.lineWidth = (tipGhost ? 3 : 2.4) / scale
+            vctx.setLineDash([7 / scale, 7 / scale])
+            if (tipGhost) {
+              const g = tipChopPolygon(live)
+              drawPoly(vctx, g || live, !!g)
+            } else {
+              drawPoly(vctx, live, false)
+            }
+            vctx.stroke()
+            vctx.setLineDash([])
+          }
+          vctx.restore()
         }
-        vctx.restore()
       }
       if (state.showLivePreview) {
         const lab = root.querySelector("#previewLabel")
@@ -986,12 +1044,125 @@ export function createPapercutApp(root) {
     return bi
   }
 
+  const EDGE_SNAP = 28
+  const CUT_HINT = "一刀一刀劃；連成密封再撳『確認剪口』。尖角一刀過兩條摺邊會即刻飛走。"
+
   function isSealedLoop(pts) {
     if (!pts || pts.length < 8) return false
     const first = pts[0], last = pts[pts.length - 1]
     const dist = Math.hypot(last.x - first.x, last.y - first.y)
     const len = pathLength(pts)
     return dist < Math.max(22, Math.min(40, 0.08 * len)) && len > 48
+  }
+
+  /** Order knife edges into one polyline by snapping endpoints (~28px). */
+  function chainEdgePoints(edges, snap = EDGE_SNAP) {
+    if (!edges || !edges.length) return null
+    const remaining = edges.filter((e) => e && e.length >= 2).map((e) => e.slice())
+    if (!remaining.length) return null
+    let chain = remaining.shift()
+    let guard = remaining.length + 3
+    while (remaining.length && guard-- > 0) {
+      const head = chain[0], tail = chain[chain.length - 1]
+      let found = -1, reverse = false, atHead = false
+      for (let i = 0; i < remaining.length; i++) {
+        const e = remaining[i]
+        const a = e[0], b = e[e.length - 1]
+        if (Math.hypot(tail.x - a.x, tail.y - a.y) <= snap) { found = i; reverse = false; atHead = false; break }
+        if (Math.hypot(tail.x - b.x, tail.y - b.y) <= snap) { found = i; reverse = true; atHead = false; break }
+        if (Math.hypot(head.x - b.x, head.y - b.y) <= snap) { found = i; reverse = false; atHead = true; break }
+        if (Math.hypot(head.x - a.x, head.y - a.y) <= snap) { found = i; reverse = true; atHead = true; break }
+      }
+      if (found < 0) break
+      let e = remaining.splice(found, 1)[0]
+      if (reverse) e = e.slice().reverse()
+      if (atHead) chain = e.slice(0, -1).concat(chain)
+      else chain = chain.concat(e.slice(1))
+    }
+    if (remaining.length) return null
+    return chain
+  }
+
+  function chainSealGap(chain) {
+    if (!chain || chain.length < 3) return Infinity
+    const a = chain[0], b = chain[chain.length - 1]
+    return Math.hypot(a.x - b.x, a.y - b.y)
+  }
+
+  function sealedPolygonFromEdges(edges, snap = EDGE_SNAP) {
+    const chain = chainEdgePoints(edges, snap)
+    if (!chain || chainSealGap(chain) > snap) return null
+    return chain
+  }
+
+  /** Ghost poly when chain is sealed or nearly sealed (incl. live stroke). */
+  function sealGhostPolygon(edges, liveStroke) {
+    const all = (edges || []).slice()
+    if (liveStroke && liveStroke.length >= 2) all.push(liveStroke)
+    if (!all.length) return null
+    const chain = chainEdgePoints(all, EDGE_SNAP)
+    if (!chain) return null
+    const gap = chainSealGap(chain)
+    if (gap > EDGE_SNAP * 2.2) return null
+    return chain
+  }
+
+  function commitHoleFromPoly(pts) {
+    if (!pts || pts.length < 3) return false
+    snapshot()
+    wctx.save()
+    clipPacket(wctx)
+    clipPaper(wctx)
+    wctx.globalCompositeOperation = "destination-out"
+    wctx.fillStyle = "#000"
+    let path = pts.slice()
+    const first = pts[0], last = pts[pts.length - 1]
+    if (Math.hypot(last.x - first.x, last.y - first.y) > 1) {
+      path.push({ x: first.x, y: first.y })
+    }
+    path = smoothClosePath(path)
+    const cx = SIZE / 2, cy = SIZE / 2
+    if (pointInPoly(cx, cy, path)) {
+      drawPoly(wctx, [{ x: cx, y: cy }, ...path])
+    } else {
+      drawPoly(wctx, path)
+    }
+    wctx.fill()
+    wctx.restore()
+    return true
+  }
+
+  function confirmCutEdges() {
+    const poly = sealedPolygonFromEdges(state.cutEdges, EDGE_SNAP)
+    if (!poly) {
+      flashSealHint()
+      return
+    }
+    commitHoleFromPoly(poly)
+    state.cutEdges = []
+    state.strokePts = []
+    syncCutActions()
+    drawView()
+  }
+
+  function syncCutActions() {
+    if (state.step !== "cut") return
+    const row = controls.querySelector("#cutActions")
+    if (!row) return
+    let conf = row.querySelector("#confirmCut")
+    if (state.cutEdges.length >= 1) {
+      if (!conf) {
+        conf = document.createElement("button")
+        conf.type = "button"
+        conf.className = "primary"
+        conf.id = "confirmCut"
+        conf.textContent = "確認剪口"
+        conf.onclick = () => confirmCutEdges()
+        row.appendChild(conf)
+      }
+    } else if (conf) {
+      conf.remove()
+    }
   }
 
   function isTipChopStroke(pts) {
@@ -1026,52 +1197,47 @@ export function createPapercutApp(root) {
 
   function flashSealHint() {
     const prev = hint.textContent
-    hint.textContent = "要圍成密封圖形先剪得走"
+    hint.textContent = "要連成密封剪口先剪得走——再撳『確認剪口』"
     hint.classList.add("hint-flash")
     clearTimeout(flashSealHint._t)
     flashSealHint._t = setTimeout(() => {
       hint.classList.remove("hint-flash")
       if (state.step === "cut") {
-        hint.textContent = "虛線係摺邊；畫面係摺起嗰一叠扇形。要圍成密封圖形先剪得走（豆／葉形窿）；尖角剪過兩條摺邊會整塊尖角飛走。左下角係展開預覽。"
+        hint.textContent = CUT_HINT
       } else {
         hint.textContent = prev
       }
     }, 1600)
   }
 
-  function commitClosedCut(pts) {
-    if (!pts || pts.length < 2) return
-    const sealed = isSealedLoop(pts)
-    const tipChop = isTipChopStroke(pts)
-    if (!sealed && !tipChop) {
-      flashSealHint()
-      return
-    }
+  function commitTipChop(pts) {
+    if (!pts || pts.length < 2 || !isTipChopStroke(pts)) return false
     snapshot()
     wctx.save()
     clipPacket(wctx)
     clipPaper(wctx)
     wctx.globalCompositeOperation = "destination-out"
     wctx.fillStyle = "#000"
-    if (tipChop && !sealed) {
-      drawPoly(wctx, tipChopPolygon(pts) || [{ x: SIZE / 2, y: SIZE / 2 }, ...pts])
-      wctx.fill()
-    } else {
-      let path = pts.slice()
-      const first = pts[0], last = pts[pts.length - 1]
-      if (Math.hypot(last.x - first.x, last.y - first.y) > 8) {
-        path.push({ x: first.x, y: first.y })
-      }
-      path = smoothClosePath(path)
-      const cx = SIZE / 2, cy = SIZE / 2
-      if (pointInPoly(cx, cy, path) || tipChop) {
-        drawPoly(wctx, [{ x: cx, y: cy }, ...path])
-      } else {
-        drawPoly(wctx, path)
-      }
-      wctx.fill()
-    }
+    drawPoly(wctx, tipChopPolygon(pts) || [{ x: SIZE / 2, y: SIZE / 2 }, ...pts])
+    wctx.fill()
     wctx.restore()
+    return true
+  }
+
+  /** Kept for tip-chop / legacy sealed path; normal strokes use cutEdges + confirm. */
+  function commitClosedCut(pts) {
+    if (!pts || pts.length < 2) return
+    const tipChop = isTipChopStroke(pts)
+    if (tipChop) {
+      commitTipChop(pts)
+      return
+    }
+    const sealed = isSealedLoop(pts)
+    if (!sealed) {
+      flashSealHint()
+      return
+    }
+    commitHoleFromPoly(pts)
   }
 
   function paintAt(p, { stampOnce = false } = {}) {
@@ -1121,14 +1287,27 @@ export function createPapercutApp(root) {
     paintAt(pointerPos(e))
   }
   function onUp() {
-    if (state.drawing && state.mode === "cut" && state.strokePts.length >= 3) {
-      commitClosedCut(state.strokePts)
+    if (state.drawing && state.mode === "cut" && state.strokePts.length >= 2) {
+      const stroke = state.strokePts.slice()
+      if (isTipChopStroke(stroke)) {
+        // one knife across both fold rays near tip → tip flies off immediately
+        commitTipChop(stroke)
+      } else {
+        state.cutEdges.push(stroke)
+        // auto-commit only when edge chain endpoints seal (not loose single-lasso nearLoop)
+        const poly = sealedPolygonFromEdges(state.cutEdges, EDGE_SNAP)
+        if (poly) {
+          commitHoleFromPoly(poly)
+          state.cutEdges = []
+        }
+      }
     }
     state.drawing = false
     state.last = null
     state.strokePts = []
     draggingResult = false
     tiltWrap.style.transform = ""
+    syncCutActions()
     drawView()
   }
 
