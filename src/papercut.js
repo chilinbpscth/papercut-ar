@@ -3,7 +3,7 @@ let PAPER = "#c41e3a"
 const TABLE = "#fff4e8" // light window through cuts (dark/vermilion paper)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-still"
+const APP_VERSION = "v20260906-class2"
 /** Hole-through fill under cuts: light paper needs dark desk so holes read. */
 function holeFill() {
   const hex = String(PAPER || "#c41e3a").replace("#", "").trim()
@@ -114,6 +114,75 @@ export function createPapercutApp(root) {
     ctx.clip()
   }
 
+  function paperHalf() { return SIZE * 0.42 } // clipPaper margin 0.08 → 半邊 0.42
+
+  function drawPoly(ctx, poly, close = true) {
+    if (!poly || poly.length < 2) return
+    ctx.beginPath()
+    ctx.moveTo(poly[0].x, poly[0].y)
+    for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y)
+    if (close) ctx.closePath()
+  }
+
+  function clipHalfPoly(poly, aRad, sign, cx, cy) {
+    const dx = Math.cos(aRad), dy = Math.sin(aRad)
+    const ev = (p) => (dx * (p.y - cy) - dy * (p.x - cx)) * sign
+    const out = []
+    for (let i = 0; i < poly.length; i++) {
+      const p1 = poly[i], p2 = poly[(i + 1) % poly.length]
+      const e1 = ev(p1), e2 = ev(p2)
+      if (e1 >= 0) out.push(p1)
+      if ((e1 >= 0) !== (e2 >= 0)) {
+        const t = e1 / ((e1 - e2) || 1e-9)
+        out.push({ x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t })
+      }
+    }
+    return out
+  }
+
+  function squareOutlinePoly() {
+    const H = paperHalf(), cx = SIZE / 2, cy = SIZE / 2
+    return [
+      { x: cx - H, y: cy - H }, { x: cx + H, y: cy - H },
+      { x: cx + H, y: cy + H }, { x: cx - H, y: cy + H },
+    ]
+  }
+
+  /** 摺完最上層要剪嘅包：圓＝扇；方＝正方形 ∩ 兩摺半平面（POC clipHalf） */
+  function packetPoly() {
+    const cx = SIZE / 2, cy = SIZE / 2
+    const n = state.sectors
+    const a0 = -Math.PI / 2
+    const a1 = a0 + (Math.PI * 2) / n
+    if (state.shape === "circle") {
+      const r = SIZE * 0.46, pts = [{ x: cx, y: cy }]
+      for (let i = 0; i <= 16; i++) {
+        const a = a0 + (a1 - a0) * (i / 16)
+        pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r })
+      }
+      return pts
+    }
+    let poly = squareOutlinePoly()
+    poly = clipHalfPoly(poly, a0, 1, cx, cy)
+    poly = clipHalfPoly(poly, a1, -1, cx, cy)
+    return poly
+  }
+
+  function clipPacket(ctx) {
+    drawPoly(ctx, packetPoly())
+    ctx.clip()
+  }
+
+  function rayToPaperEdge(ang, cx, cy) {
+    if (state.shape === "circle") {
+      const r = SIZE * 0.46
+      return { x: cx + Math.cos(ang) * r, y: cy + Math.sin(ang) * r }
+    }
+    const H = paperHalf()
+    const d = H / Math.max(Math.abs(Math.cos(ang)), Math.abs(Math.sin(ang)))
+    return { x: cx + Math.cos(ang) * d, y: cy + Math.sin(ang) * d }
+  }
+
   function cutViewParams() {
     const n = state.sectors
     const theta = (Math.PI * 2) / n
@@ -151,6 +220,7 @@ export function createPapercutApp(root) {
     const a0 = -Math.PI / 2
     const a1 = a0 + theta
     const cx = SIZE / 2, cy = SIZE / 2
+    const pack = packetPoly()
 
     ctx.fillStyle = "#efe6d8"
     ctx.fillRect(0, 0, SIZE, SIZE)
@@ -167,10 +237,7 @@ export function createPapercutApp(root) {
       ctx.rotate(-Math.PI / 2 - mid)
       ctx.scale(scale, scale)
       ctx.translate(-cx, -cy)
-      ctx.beginPath()
-      ctx.moveTo(cx, cy)
-      ctx.arc(cx, cy, paperR, a0, a1)
-      ctx.closePath()
+      drawPoly(ctx, pack)
       ctx.fillStyle = L.fill
       ctx.fill()
       ctx.restore()
@@ -179,10 +246,7 @@ export function createPapercutApp(root) {
     // soft drop shadow for the top wedge
     ctx.save()
     applyCutViewTransform(ctx)
-    ctx.beginPath()
-    ctx.moveTo(cx, cy)
-    ctx.arc(cx, cy, paperR, a0, a1)
-    ctx.closePath()
+    drawPoly(ctx, pack)
     ctx.shadowColor = "rgba(44,36,32,0.38)"
     ctx.shadowBlur = 24
     ctx.shadowOffsetX = 6
@@ -195,31 +259,30 @@ export function createPapercutApp(root) {
     ctx.save()
     applyCutViewTransform(ctx)
     ctx.save()
-    clipSector(ctx, n)
+    clipPacket(ctx)
     clipPaper(ctx)
     ctx.fillStyle = holeFill()
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.drawImage(wedge, 0, 0)
     ctx.restore()
 
-    // dashed fold edges (a0 / a1)
+    // dashed fold edges (a0 / a1) to paper edge
+    const e0 = rayToPaperEdge(a0, cx, cy)
+    const e1 = rayToPaperEdge(a1, cx, cy)
     ctx.strokeStyle = "rgba(44,36,32,0.78)"
     ctx.lineWidth = 2.4 / scale
     ctx.setLineDash([11 / scale, 8 / scale])
     ctx.lineCap = "round"
     ctx.beginPath()
-    ctx.moveTo(cx, cy)
-    ctx.lineTo(cx + Math.cos(a0) * paperR, cy + Math.sin(a0) * paperR)
-    ctx.moveTo(cx, cy)
-    ctx.lineTo(cx + Math.cos(a1) * paperR, cy + Math.sin(a1) * paperR)
+    ctx.moveTo(cx, cy); ctx.lineTo(e0.x, e0.y)
+    ctx.moveTo(cx, cy); ctx.lineTo(e1.x, e1.y)
     ctx.stroke()
     ctx.setLineDash([])
 
-    // soft outer arc (rim)
+    // soft outer rim (packet outline)
     ctx.strokeStyle = "rgba(44,36,32,0.3)"
     ctx.lineWidth = 1.6 / scale
-    ctx.beginPath()
-    ctx.arc(cx, cy, paperR, a0, a1)
+    drawPoly(ctx, pack)
     ctx.stroke()
     ctx.restore()
 
@@ -257,7 +320,7 @@ export function createPapercutApp(root) {
     PAPER = state.paperTone || "#f7efe2"
     wctx.clearRect(0, 0, SIZE, SIZE)
     wctx.save()
-    clipSector(wctx, state.sectors)
+    clipPacket(wctx)
     clipPaper(wctx)
     wctx.fillStyle = PAPER
     wctx.fillRect(0, 0, SIZE, SIZE)
@@ -277,7 +340,7 @@ export function createPapercutApp(root) {
     state.history = []
     snapshot()
     wctx.save()
-    clipSector(wctx, state.sectors)
+    clipPacket(wctx)
     clipPaper(wctx)
     wctx.globalCompositeOperation = "destination-out"
     wctx.fillStyle = "#000"
@@ -367,6 +430,15 @@ export function createPapercutApp(root) {
     wctx.restore()
   }
 
+  function drawMountFrame(ctx, s) {
+    ctx.fillStyle = "#c41e3a"
+    ctx.fillRect(0, 0, s, s)
+    ctx.fillStyle = "#d4a017"
+    ctx.fillRect(6, 6, s - 12, s - 12)
+    ctx.fillStyle = "#f3e6d0"
+    ctx.fillRect(10, 10, s - 20, s - 20)
+  }
+
   function composeFull(ctx, withShadow = true) {
     ctx.fillStyle = "#efe6d8"
     ctx.fillRect(0, 0, SIZE, SIZE)
@@ -422,124 +494,143 @@ export function createPapercutApp(root) {
   }
 
   function drawFoldGuide(ctx) {
-    // Same radial-sector language for circle AND square: rays from center,
-    // one dark active wedge (= 之後剪呢格), light inactive wedges.
-    const n = state.sectors, cx = SIZE / 2, cy = SIZE / 2
-    const paperR = SIZE * 0.46
+    const cx = SIZE / 2, cy = SIZE / 2
+    const n = state.sectors
     ctx.fillStyle = "#efe6d8"
     ctx.fillRect(0, 0, SIZE, SIZE)
 
-    // light paper base (inactive look)
     ctx.save()
     clipPaper(ctx)
     ctx.fillStyle = "#f4ebe0"
     ctx.fillRect(0, 0, SIZE, SIZE)
-    ctx.restore()
 
-    // inactive sectors: soft rice-paper wedges
-    for (let i = 1; i < n; i++) {
-      ctx.save()
-      ctx.translate(cx, cy)
-      ctx.rotate((i * Math.PI * 2) / n)
-      ctx.translate(-cx, -cy)
+    if (state.shape === "square") {
+      ctx.fillStyle = "#efe4d4"
+      ctx.fillRect(0, 0, SIZE, SIZE)
+
+      const pack = packetPoly()
+      drawPoly(ctx, pack)
+      const tone = String(PAPER || VERMILION).toLowerCase()
+      const light = ["#efe6d4", "#f3e4c8", "#f3d9de", "#dceee6", "#f7efe2"].includes(tone)
+      ctx.fillStyle = light ? VERMILION : PAPER
+      ctx.fill()
+      ctx.fillStyle = "rgba(44,36,32,0.22)"
+      ctx.fill()
+
+      ctx.strokeStyle = "rgba(212,160,23,0.9)"
+      ctx.lineWidth = 2.4
+      ctx.setLineDash([14, 10])
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI * 2) / n
+        const e = rayToPaperEdge(a, cx, cy)
+        ctx.beginPath()
+        ctx.moveTo(cx, cy)
+        ctx.lineTo(e.x, e.y)
+        ctx.stroke()
+      }
+      ctx.setLineDash([])
+
+      const foldHint = state.folds === 1
+        ? "對摺一次 → 剪呢半邊"
+        : state.folds === 2
+          ? "再對摺 → 剪呢一角（4 層）"
+          : "第三次對角摺 → 剪呢個三角（8 層）"
+      let lx = 0, ly = 0
+      for (const p of pack) { lx += p.x; ly += p.y }
+      lx /= pack.length; ly /= pack.length
+      ctx.font = '700 16px "Noto Sans TC","PingFang HK",sans-serif'
+      ctx.textAlign = "center"
+      ctx.textBaseline = "middle"
+      const tw = ctx.measureText(foldHint).width
+      const bw = tw + 20, bh = 28
+      ctx.fillStyle = "rgba(255,250,243,0.94)"
+      ctx.strokeStyle = "rgba(196,30,58,0.55)"
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.roundRect(lx - bw / 2, ly - bh / 2, bw, bh, 14)
+      ctx.fill(); ctx.stroke()
+      ctx.fillStyle = "#2c2420"
+      ctx.fillText(foldHint, lx, ly)
+    } else {
+      // 圓形：保留 inactive pie + active clipSector 深色扇 + 金射線
+      const paperR = SIZE * 0.46
+      for (let i = 1; i < n; i++) {
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate((i * Math.PI * 2) / n)
+        ctx.translate(-cx, -cy)
+        ctx.save()
+        clipSector(ctx, n)
+        ctx.fillStyle = i % 2 ? "#efe4d4" : "#f7efe2"
+        ctx.fillRect(0, 0, SIZE, SIZE)
+        ctx.restore()
+        ctx.restore()
+      }
       ctx.save()
       clipSector(ctx, n)
-      clipPaper(ctx)
-      ctx.fillStyle = i % 2 ? "#efe4d4" : "#f7efe2"
+      const tone = String(PAPER || VERMILION).toLowerCase()
+      const lumGuess = (tone === "#efe6d4" || tone === "#f3e4c8" || tone === "#f3d9de" || tone === "#dceee6" || tone === "#f7efe2")
+      ctx.fillStyle = lumGuess ? VERMILION : PAPER
+      ctx.fillRect(0, 0, SIZE, SIZE)
+      ctx.fillStyle = lumGuess ? "rgba(44,36,32,0.18)" : "rgba(44,36,32,0.28)"
       ctx.fillRect(0, 0, SIZE, SIZE)
       ctx.restore()
-      ctx.restore()
-    }
 
-    // active sector 0: dark / strong vermilion — "之後剪呢格"
-    ctx.save()
-    clipSector(ctx, n)
-    clipPaper(ctx)
-    // prefer strong vermilion/ink for the active wedge so light paper tones still read dark=cut
-    const tone = String(PAPER || VERMILION).toLowerCase()
-    const lumGuess = (tone === "#efe6d4" || tone === "#f3e4c8" || tone === "#f3d9de" || tone === "#dceee6" || tone === "#f7efe2")
-    ctx.fillStyle = lumGuess ? VERMILION : PAPER
-    ctx.fillRect(0, 0, SIZE, SIZE)
-    ctx.fillStyle = lumGuess ? "rgba(44,36,32,0.18)" : "rgba(44,36,32,0.28)"
-    ctx.fillRect(0, 0, SIZE, SIZE)
-    ctx.restore()
+      ctx.strokeStyle = "rgba(212,160,23,0.85)"
+      ctx.lineWidth = 2.2
+      for (let i = 0; i < n; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI * 2) / n
+        ctx.beginPath()
+        ctx.moveTo(cx, cy)
+        ctx.lineTo(cx + Math.cos(a) * SIZE, cy + Math.sin(a) * SIZE)
+        ctx.stroke()
+      }
 
-    // fold rays from center (square uses same pie language as circle)
-    ctx.save()
-    clipPaper(ctx)
-    ctx.strokeStyle = "rgba(212,160,23,0.85)"
-    ctx.lineWidth = 2.2
-    for (let i = 0; i < n; i++) {
-      const a = -Math.PI / 2 + (i * Math.PI * 2) / n
+      const mid = -Math.PI / 2 + Math.PI / n
+      const lx = cx + Math.cos(mid) * paperR * 0.55
+      const ly = cy + Math.sin(mid) * paperR * 0.55
+      ctx.font = '700 18px "Noto Sans TC","PingFang HK",sans-serif'
+      ctx.textAlign = "center"
+      ctx.textBaseline = "middle"
+      const label = "之後剪呢格"
+      const tw = ctx.measureText(label).width
+      const pad = 10
+      ctx.fillStyle = "rgba(255,250,243,0.94)"
+      ctx.strokeStyle = "rgba(196,30,58,0.55)"
+      ctx.lineWidth = 1.5
+      const bw = tw + pad * 2, bh = 28
+      const bx = lx - bw / 2, by = ly - bh / 2
       ctx.beginPath()
-      ctx.moveTo(cx, cy)
-      ctx.lineTo(cx + Math.cos(a) * SIZE, cy + Math.sin(a) * SIZE)
-      ctx.stroke()
+      ctx.roundRect(bx, by, bw, bh, 14)
+      ctx.fill(); ctx.stroke()
+      ctx.fillStyle = "#2c2420"
+      ctx.fillText(label, lx, ly)
     }
     ctx.restore()
 
-    // outline
     ctx.strokeStyle = GOLD
     ctx.lineWidth = 3
     ctx.beginPath()
-    if (state.shape === "circle") ctx.arc(cx, cy, paperR, 0, Math.PI * 2)
+    if (state.shape === "circle") ctx.arc(cx, cy, SIZE * 0.46, 0, Math.PI * 2)
     else {
       const m = SIZE * 0.08
       ctx.rect(m, m, SIZE - m * 2, SIZE - m * 2)
     }
     ctx.stroke()
 
-    // label on active wedge midpoint
-    const mid = -Math.PI / 2 + Math.PI / n
-    const lx = cx + Math.cos(mid) * paperR * 0.55
-    const ly = cy + Math.sin(mid) * paperR * 0.55
-    ctx.save()
-    ctx.font = "700 18px \"Noto Sans TC\", \"PingFang HK\", sans-serif"
-    ctx.textAlign = "center"
-    ctx.textBaseline = "middle"
-    const label = "之後剪呢格"
-    const tw = ctx.measureText(label).width
-    const pad = 10
-    ctx.fillStyle = "rgba(255,250,243,0.94)"
-    ctx.strokeStyle = "rgba(196,30,58,0.55)"
-    ctx.lineWidth = 1.5
-    const bw = tw + pad * 2, bh = 28
-    const bx = lx - bw / 2, by = ly - bh / 2
-    ctx.beginPath()
-    const rr = 14
-    ctx.moveTo(bx + rr, by)
-    ctx.arcTo(bx + bw, by, bx + bw, by + bh, rr)
-    ctx.arcTo(bx + bw, by + bh, bx, by + bh, rr)
-    ctx.arcTo(bx, by + bh, bx, by, rr)
-    ctx.arcTo(bx, by, bx + bw, by, rr)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-    ctx.fillStyle = "#2c2420"
-    ctx.fillText(label, lx, ly)
-    ctx.restore()
-
-    // legend chip
-    ctx.font = "600 13px \"Noto Sans TC\", \"PingFang HK\", sans-serif"
+    ctx.font = '600 13px "Noto Sans TC","PingFang HK",sans-serif'
     ctx.textAlign = "left"
     ctx.textBaseline = "middle"
+    const legend = "深色＝剪 · 淺色＝摺埋"
+    const lw = ctx.measureText(legend).width
     ctx.fillStyle = "rgba(255,248,240,0.92)"
     ctx.strokeStyle = "rgba(196,160,100,0.5)"
     ctx.lineWidth = 1
-    const legend = "深色＝剪 · 淺色＝摺埋"
-    const lw = ctx.measureText(legend).width
-    const x0 = 14, y0 = SIZE - 36, ww = lw + 20, hh = 24
     ctx.beginPath()
-    ctx.moveTo(x0 + 10, y0)
-    ctx.arcTo(x0 + ww, y0, x0 + ww, y0 + hh, 10)
-    ctx.arcTo(x0 + ww, y0 + hh, x0, y0 + hh, 10)
-    ctx.arcTo(x0, y0 + hh, x0, y0, 10)
-    ctx.arcTo(x0, y0, x0 + ww, y0, 10)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
+    ctx.roundRect(14, SIZE - 36, lw + 20, 24, 10)
+    ctx.fill(); ctx.stroke()
     ctx.fillStyle = "#5a4638"
-    ctx.fillText(legend, x0 + 10, y0 + hh / 2)
+    ctx.fillText(legend, 24, SIZE - 24)
   }
 
   function renderSteps() {
@@ -580,7 +671,9 @@ export function createPapercutApp(root) {
       controls.querySelectorAll("[data-f]").forEach((b) => {
         b.onclick = () => { state.folds = Number(b.dataset.f); state.sectors = sectorsFromFolds(state.folds); render() }
       })
-      hint.textContent = "深色扇形＝之後剪呢格（摺起嗰一叠）；淺色＝摺埋嘅部分。建議先試「摺 2～3 次」。"
+      hint.textContent = state.shape === "square"
+        ? "方形：深色塊＝摺完最上面嗰包（1次對半、2次一角、3次對角三角）。淺色＝摺埋睇唔到。"
+        : "圓形：深色扇形＝摺起要剪嗰格；淺色＝摺埋。建議先試摺 2～3 次。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">下一步：開始剪</button>`
       actions.querySelector("#back").onclick = () => { state.step = "shape"; render() }
@@ -623,7 +716,7 @@ export function createPapercutApp(root) {
     } else {
       controls.innerHTML = `<div class="row"><h2>成品</h2>
         <span style="color:var(--muted)">${state.sectors} 等份對稱 · 可下載或返回再剪</span></div>`
-      hint.textContent = `按你摺嘅次數展開成 ${state.sectors} 等份。拖住可轉。夠美就下載貼簿。`
+      hint.textContent = `按你摺嘅次數展開成 ${state.sectors} 等份。夠美就下載貼簿。`
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
         <button type="button" class="secondary" id="cam">相機擺放（簡易）</button>
@@ -639,11 +732,15 @@ export function createPapercutApp(root) {
         const prev = state.unfoldT
         state.unfoldT = 1
         const out = document.createElement("canvas")
-        out.width = SIZE * 2
-        out.height = SIZE * 2
+        out.width = SIZE * 2 + 96
+        out.height = SIZE * 2 + 96
         const octx = out.getContext("2d")
+        drawMountFrame(octx, out.width)
+        octx.save()
+        octx.translate(48, 48)
         octx.scale(2, 2)
-        composeFull(octx)
+        composeFull(octx, true)
+        octx.restore()
         state.unfoldT = prev
         out.toBlob((blob) => cb(blob, out), "image/png")
       }
@@ -704,42 +801,39 @@ export function createPapercutApp(root) {
         const { scale } = cutViewParams()
         vctx.save()
         applyCutViewTransform(vctx)
-        clipSector(vctx, state.sectors)
+        clipPacket(vctx)
         clipPaper(vctx)
         const pts = state.strokePts
         const first = pts[0], last = pts[pts.length - 1]
         const dist = Math.hypot(last.x - first.x, last.y - first.y)
         const len = pathLength(pts)
         const nearLoop = dist < Math.max(24, 0.22 * len) && pts.length >= 6
-        // only show fill ghost when near-closed; open line is NOT a valid cut
-        if (nearLoop) {
-          vctx.fillStyle = "rgba(44,36,32,0.18)"
-          vctx.beginPath()
-          vctx.moveTo(first.x, first.y)
-          for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
-          vctx.closePath()
-          vctx.fill()
+        const tipGhost = isTipChopStroke(pts)
+        vctx.lineCap = "round"
+        vctx.lineJoin = "round"
+        if (nearLoop || tipGhost) {
+          vctx.fillStyle = "rgba(44,36,32,0.22)"
+          if (tipGhost && !nearLoop) {
+            const g = tipChopPolygon(pts)
+            if (g) { drawPoly(vctx, g); vctx.fill() }
+          } else {
+            vctx.beginPath()
+            vctx.moveTo(pts[0].x, pts[0].y)
+            for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
+            vctx.closePath()
+            vctx.fill()
+          }
           vctx.strokeStyle = "rgba(44,36,32,0.85)"
           vctx.lineWidth = 3 / scale
           vctx.setLineDash([8 / scale, 6 / scale])
-          vctx.lineCap = "round"
-          vctx.lineJoin = "round"
-          vctx.beginPath()
-          vctx.moveTo(pts[0].x, pts[0].y)
-          for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
-          vctx.closePath()
+          drawPoly(vctx, tipGhost && !nearLoop ? (tipChopPolygon(pts) || pts) : pts, !!nearLoop || tipGhost)
           vctx.stroke()
           vctx.setLineDash([])
         } else {
-          // faint guide only — not emphasized as a valid open cut
           vctx.strokeStyle = "rgba(44,36,32,0.35)"
           vctx.lineWidth = 2 / scale
           vctx.setLineDash([6 / scale, 8 / scale])
-          vctx.lineCap = "round"
-          vctx.lineJoin = "round"
-          vctx.beginPath()
-          vctx.moveTo(pts[0].x, pts[0].y)
-          for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
+          drawPoly(vctx, pts, false)
           vctx.stroke()
           vctx.setLineDash([])
         }
@@ -775,12 +869,19 @@ export function createPapercutApp(root) {
   }
 
   function inActiveSector(x, y) {
-    const cx = SIZE / 2, cy = SIZE / 2
-    let a = Math.atan2(y - cy, x - cx)
-    let rel = a + Math.PI / 2
-    while (rel < 0) rel += Math.PI * 2
-    while (rel >= Math.PI * 2) rel -= Math.PI * 2
-    return rel <= (Math.PI * 2) / state.sectors + 0.06
+    // square/circle both use packet geometry so hit-test matches clipPacket
+    const pack = packetPoly()
+    if (pointInPoly(x, y, pack)) return true
+    // slight angular slack for circle fingers near fold rays
+    if (state.shape === "circle") {
+      const cx = SIZE / 2, cy = SIZE / 2
+      let a = Math.atan2(y - cy, x - cx)
+      let rel = a + Math.PI / 2
+      while (rel < 0) rel += Math.PI * 2
+      while (rel >= Math.PI * 2) rel -= Math.PI * 2
+      return rel <= (Math.PI * 2) / state.sectors + 0.06
+    }
+    return false
   }
 
   function stampAt(ctx, p, kind, r) {
@@ -849,34 +950,78 @@ export function createPapercutApp(root) {
     return inside
   }
 
-  function pathCrossesBothRays(pts, a0, a1, cx, cy, rayTol) {
-    let hit0 = false, hit1 = false
-    for (const p of pts) {
-      if (distToRay(p, a0, cx, cy) < rayTol) hit0 = true
-      if (distToRay(p, a1, cx, cy) < rayTol) hit1 = true
-      if (hit0 && hit1) return true
+  function raySegHit(cx, cy, angle, p1, p2) {
+    const rx = Math.cos(angle), ry = Math.sin(angle)
+    const sx = p2.x - p1.x, sy = p2.y - p1.y
+    const den = rx * sy - ry * sx
+    if (Math.abs(den) < 1e-8) return null
+    const qx = p1.x - cx, qy = p1.y - cy
+    const tRay = (qx * sy - qy * sx) / den
+    const tSeg = (rx * qy - ry * qx) / den
+    if (tRay >= 0 && tSeg >= 0 && tSeg <= 1) {
+      return { x: cx + rx * tRay, y: cy + ry * tRay, tRay }
     }
-    return false
+    return null
   }
 
-  function isTipChopChord(pts, a0, a1, cx, cy) {
-    if (!pts || pts.length < 2) return false
-    const first = pts[0], last = pts[pts.length - 1]
-    const rayTol = 28
-    const d0f = distToRay(first, a0, cx, cy)
-    const d1f = distToRay(first, a1, cx, cy)
-    const d0l = distToRay(last, a0, cx, cy)
-    const d1l = distToRay(last, a1, cx, cy)
-    const endsOnOpposite =
-      (d0f < rayTol && d1l < rayTol) || (d1f < rayTol && d0l < rayTol)
-    if (!endsOnOpposite) return false
-    // path should stay somewhat near the tip (尖角) — not a distant rim chord
-    let minR = Infinity
-    for (const p of pts) {
-      const r = Math.hypot(p.x - cx, p.y - cy)
-      if (r < minR) minR = r
+  function strokeHitsRay(pts, angle, cx, cy, tol) {
+    let best = null, bestD = tol
+    for (let i = 0; i < pts.length; i++) {
+      const d = distToRay(pts[i], angle, cx, cy)
+      if (d < bestD) { bestD = d; best = { x: pts[i].x, y: pts[i].y, idx: i } }
+      if (i > 0) {
+        const hit = raySegHit(cx, cy, angle, pts[i - 1], pts[i])
+        if (hit) return { hit: true, at: hit }
+      }
     }
-    return minR < SIZE * 0.42
+    return best ? { hit: true, at: best } : { hit: false }
+  }
+
+  function nearestIdx(pts, at) {
+    let bi = 0, bd = Infinity
+    for (let i = 0; i < pts.length; i++) {
+      const d = Math.hypot(pts[i].x - at.x, pts[i].y - at.y)
+      if (d < bd) { bd = d; bi = i }
+    }
+    return bi
+  }
+
+  function isSealedLoop(pts) {
+    if (!pts || pts.length < 8) return false
+    const first = pts[0], last = pts[pts.length - 1]
+    const dist = Math.hypot(last.x - first.x, last.y - first.y)
+    const len = pathLength(pts)
+    return dist < Math.max(22, Math.min(40, 0.08 * len)) && len > 48
+  }
+
+  function isTipChopStroke(pts) {
+    if (!pts || pts.length < 2) return false
+    const cx = SIZE / 2, cy = SIZE / 2
+    const n = state.sectors
+    const a0 = -Math.PI / 2
+    const a1 = a0 + (Math.PI * 2) / n
+    const h0 = strokeHitsRay(pts, a0, cx, cy, 36)
+    const h1 = strokeHitsRay(pts, a1, cx, cy, 36)
+    if (!h0.hit || !h1.hit) return false
+    let minR = Infinity
+    for (const p of pts) minR = Math.min(minR, Math.hypot(p.x - cx, p.y - cy))
+    const paperR = state.shape === "circle" ? SIZE * 0.46 : SIZE * 0.42
+    return minR < paperR * 0.62
+  }
+
+  function tipChopPolygon(pts) {
+    const cx = SIZE / 2, cy = SIZE / 2
+    const n = state.sectors
+    const a0 = -Math.PI / 2, a1 = a0 + (Math.PI * 2) / n
+    const h0 = strokeHitsRay(pts, a0, cx, cy, 36)
+    const h1 = strokeHitsRay(pts, a1, cx, cy, 36)
+    if (!h0.hit || !h1.hit) return null
+    const i0 = nearestIdx(pts, h0.at)
+    const i1 = nearestIdx(pts, h1.at)
+    const lo = Math.min(i0, i1), hi = Math.max(i0, i1)
+    const mid = pts.slice(lo, hi + 1)
+    if (i0 > i1) mid.reverse()
+    return [{ x: cx, y: cy }, h0.at, ...mid, h1.at]
   }
 
   function flashSealHint() {
@@ -896,81 +1041,34 @@ export function createPapercutApp(root) {
 
   function commitClosedCut(pts) {
     if (!pts || pts.length < 2) return
-    const first = pts[0], last = pts[pts.length - 1]
-    const dist = Math.hypot(last.x - first.x, last.y - first.y)
-    const len = pathLength(pts)
-    const cx = SIZE / 2, cy = SIZE / 2
-    const n = state.sectors
-    const a0 = -Math.PI / 2
-    const a1 = a0 + (Math.PI * 2) / n
-
-    // small tap punch OK
-    if (len < 16 && dist < 16) {
-      snapshot()
-      wctx.save()
-      clipSector(wctx, state.sectors)
-      clipPaper(wctx)
-      wctx.globalCompositeOperation = "destination-out"
-      wctx.fillStyle = "#000"
-      wctx.beginPath()
-      wctx.arc(first.x, first.y, Math.max(8, state.brush * 0.45), 0, Math.PI * 2)
-      wctx.fill()
-      wctx.restore()
-      return
-    }
-
-    const nearLoop = dist < Math.max(24, 0.22 * len) && pts.length >= 6
-    const tipChop = isTipChopChord(pts, a0, a1, cx, cy)
-
-    // REJECT open strokes / thin seams — only sealed shapes
-    if (!nearLoop && !tipChop) {
+    const sealed = isSealedLoop(pts)
+    const tipChop = isTipChopStroke(pts)
+    if (!sealed && !tipChop) {
       flashSealHint()
       return
     }
-
     snapshot()
     wctx.save()
-    clipSector(wctx, state.sectors)
+    clipPacket(wctx)
     clipPaper(wctx)
     wctx.globalCompositeOperation = "destination-out"
     wctx.fillStyle = "#000"
-    wctx.strokeStyle = "#000"
-    wctx.lineCap = "round"
-    wctx.lineJoin = "round"
-
-    // tip-chop chord (fold→fold, not self-closed): remove WHOLE tip piece
-    if (tipChop && !nearLoop) {
-      wctx.beginPath()
-      wctx.moveTo(cx, cy)
-      for (let i = 0; i < pts.length; i++) wctx.lineTo(pts[i].x, pts[i].y)
-      wctx.closePath()
-      wctx.fill()
-      wctx.restore()
-      return
-    }
-
-    // near-closed loop → smooth bean/leaf hole (or tip sector if tip involved)
-    let path = pts.slice()
-    if (dist > 8) path.push({ x: first.x, y: first.y })
-    path = smoothClosePath(path)
-
-    const containsTip = pointInPoly(cx, cy, path)
-    const crossesFolds = pathCrossesBothRays(pts, a0, a1, cx, cy, 26)
-    const tipInvolved = containsTip || tipChop || (crossesFolds && isTipChopChord(pts, a0, a1, cx, cy))
-
-    if (tipInvolved) {
-      // classroom scissors: tip cut across → whole tip piece gone
-      wctx.beginPath()
-      wctx.moveTo(cx, cy)
-      for (let i = 0; i < path.length; i++) wctx.lineTo(path[i].x, path[i].y)
-      wctx.closePath()
+    if (tipChop && !sealed) {
+      drawPoly(wctx, tipChopPolygon(pts) || [{ x: SIZE / 2, y: SIZE / 2 }, ...pts])
       wctx.fill()
     } else {
-      // normal leaf/bean hole away from tip
-      wctx.beginPath()
-      wctx.moveTo(path[0].x, path[0].y)
-      for (let i = 1; i < path.length; i++) wctx.lineTo(path[i].x, path[i].y)
-      wctx.closePath()
+      let path = pts.slice()
+      const first = pts[0], last = pts[pts.length - 1]
+      if (Math.hypot(last.x - first.x, last.y - first.y) > 8) {
+        path.push({ x: first.x, y: first.y })
+      }
+      path = smoothClosePath(path)
+      const cx = SIZE / 2, cy = SIZE / 2
+      if (pointInPoly(cx, cy, path) || tipChop) {
+        drawPoly(wctx, [{ x: cx, y: cy }, ...path])
+      } else {
+        drawPoly(wctx, path)
+      }
       wctx.fill()
     }
     wctx.restore()
@@ -981,7 +1079,7 @@ export function createPapercutApp(root) {
     if (state.mode === "stamp" || stampOnce) {
       snapshot()
       wctx.save()
-      clipSector(wctx, state.sectors)
+      clipPacket(wctx)
       clipPaper(wctx)
       wctx.globalCompositeOperation = "destination-out"
       wctx.fillStyle = "#000"
@@ -1049,6 +1147,7 @@ export function createPapercutApp(root) {
     if (tipCard) tipCard.open = state.step === "shape" || state.step === "fold"
     view.style.cursor = state.step === "result" ? "default" : "crosshair"
     tiltWrap.classList.toggle("is-result", state.step === "result")
+    tiltWrap.classList.toggle("artwork-frame", state.step === "result")
     renderSteps()
     renderControls()
     drawView()
