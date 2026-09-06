@@ -3,7 +3,7 @@ let PAPER = "#c41e3a"
 const TABLE = "#fff4e8" // light window through cuts (dark/vermilion paper)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-class"
+const APP_VERSION = "v20260906-still"
 /** Hole-through fill under cuts: light paper needs dark desk so holes read. */
 function holeFill() {
   const hex = String(PAPER || "#c41e3a").replace("#", "").trim()
@@ -999,9 +999,7 @@ export function createPapercutApp(root) {
 
   function onDown(e) {
     if (state.step === "result") {
-      draggingResult = true
-      dragLastX = (e.touches ? e.touches[0] : e).clientX
-      return
+      return // finished artwork stays still
     }
     if (state.step !== "cut") return
     e.preventDefault()
@@ -1019,18 +1017,7 @@ export function createPapercutApp(root) {
     paintAt(pointerPos(e))
   }
   function onMove(e) {
-    if (draggingResult && state.step === "result") {
-      const pt = e.touches ? e.touches[0] : e
-      const x = pt.clientX
-      resultAngle += (x - dragLastX) * 0.01
-      dragLastX = x
-      const rect = tiltWrap.getBoundingClientRect()
-      const nx = ((pt.clientX - rect.left) / rect.width) * 2 - 1
-      const ny = ((pt.clientY - rect.top) / rect.height) * 2 - 1
-      tiltWrap.style.transform = `perspective(900px) rotateY(${nx * 12}deg) rotateX(${-ny * 10}deg)`
-      drawView()
-      return
-    }
+    if (state.step === "result") return
     if (!state.drawing || state.step !== "cut" || state.mode === "stamp") return
     e.preventDefault()
     paintAt(pointerPos(e))
@@ -1043,7 +1030,7 @@ export function createPapercutApp(root) {
     state.last = null
     state.strokePts = []
     draggingResult = false
-    if (state.step !== "result") tiltWrap.style.transform = ""
+    tiltWrap.style.transform = ""
     drawView()
   }
 
@@ -1052,22 +1039,15 @@ export function createPapercutApp(root) {
   view.addEventListener("pointerup", onUp)
   view.addEventListener("pointercancel", onUp)
 
-  let idleSpin = 0
   function tickIdle() {
-    if (state.step === "result" && !draggingResult) {
-      resultAngle += 0.004
-      const wobble = Math.sin(idleSpin) * 6
-      tiltWrap.style.transform = `perspective(900px) rotateY(${wobble}deg) rotateX(${Math.cos(idleSpin) * 4}deg)`
-      idleSpin += 0.03
-      drawView()
-    }
+    // finished artwork stays still — no idle spin / tilt
     requestAnimationFrame(tickIdle)
   }
 
   function render() {
-    if (state.step !== "result") tiltWrap.style.transform = ""
+    tiltWrap.style.transform = ""
     if (tipCard) tipCard.open = state.step === "shape" || state.step === "fold"
-    view.style.cursor = state.step === "result" ? "grab" : "crosshair"
+    view.style.cursor = state.step === "result" ? "default" : "crosshair"
     tiltWrap.classList.toggle("is-result", state.step === "result")
     renderSteps()
     renderControls()
