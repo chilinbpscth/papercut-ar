@@ -135,3 +135,21 @@ button { min-height: 44px; }
 .cam-stage #camHud { pointer-events: auto; touch-action: none; }
 .cam-hint { color: var(--muted); font-size: 0.88rem; margin: 0.5rem 0; }
 .cam-actions { margin-bottom: 0; }
+
+.stage.tilt-wrap { position: relative; }
+.preview-stage.mini {
+  position: absolute;
+  top: 0.55rem; right: 0.55rem;
+  width: 34% !important;
+  aspect-ratio: 1;
+  margin: 0;
+  z-index: 3;
+  box-shadow: 0 6px 18px rgba(44,36,32,0.18);
+  border: 2px solid var(--gold);
+}
+.preview-stage.mini .preview-label {
+  top: 0.25rem; left: 0.25rem;
+  font-size: 0.7rem;
+  padding: 0.12rem 0.45rem;
+}
+.stage-row { display: block; }
