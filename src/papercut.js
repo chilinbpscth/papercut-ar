@@ -1,9 +1,20 @@
 const SIZE = 640
 let PAPER = "#c41e3a"
-const TABLE = "#fff4e8" // window light through cuts (not muddy desk)
+const TABLE = "#fff4e8" // light window through cuts (dark/vermilion paper)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-wedge"
+const APP_VERSION = "v20260906-ux"
+/** Hole-through fill under cuts: light paper needs dark desk so holes read. */
+function holeFill() {
+  const hex = String(PAPER || "#c41e3a").replace("#", "").trim()
+  if (hex.length < 6) return TABLE
+  const r = parseInt(hex.slice(0, 2), 16) / 255
+  const g = parseInt(hex.slice(2, 4), 16) / 255
+  const b = parseInt(hex.slice(4, 6), 16) / 255
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+  if (lum > 0.72) return "#4a3728" // warm dark desk / ink
+  return TABLE // light window for vermilion / dark paper
+}
 
 export function createPapercutApp(root) {
   const state = {
@@ -21,7 +32,7 @@ export function createPapercutApp(root) {
     showLivePreview: true,
     unfoldT: 1, // 0..1 animated unfold
     paperTone: "#c41e3a",
-    symmetryMode: "alt-mirror", // alt-mirror | rotate
+    symmetryMode: "alt-mirror", // fixed: true fold geometry (alt-mirror)
   }
 
   const wedge = document.createElement("canvas")
@@ -43,7 +54,7 @@ export function createPapercutApp(root) {
         <ol>
           <li>選圓形或方形</li>
           <li>摺 2～3 次（夠對稱又唔難）</li>
-          <li>喺亮格圍一圈放手＝封閉剪口，或印章打窿</li>
+          <li>喺扇形一叠圍一圈放手＝封閉剪口</li>
           <li>左下角睇小「展開」，再撳「預覽成品」</li>
           <li>展開睇落會密好多、同單格唔一樣——呢個就係摺紙對稱，電腦冇改你剪嘅形</li>
         </ol>
@@ -180,13 +191,13 @@ export function createPapercutApp(root) {
     ctx.fill()
     ctx.restore()
 
-    // TABLE under holes, then the actual wedge bitmap
+    // hole fill under cuts, then the actual wedge bitmap
     ctx.save()
     applyCutViewTransform(ctx)
     ctx.save()
     clipSector(ctx, n)
     clipPaper(ctx)
-    ctx.fillStyle = TABLE
+    ctx.fillStyle = holeFill()
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.drawImage(wedge, 0, 0)
     ctx.restore()
@@ -365,21 +376,21 @@ export function createPapercutApp(root) {
       ctx.shadowColor = "rgba(44,36,32,0.28)"
       ctx.shadowBlur = 18
       ctx.shadowOffsetY = 6
-      ctx.fillStyle = TABLE
+      ctx.fillStyle = holeFill()
       ctx.fillRect(0, 0, SIZE, SIZE)
       ctx.restore()
     }
-    // table under paper so cuts read as holes
+    // hole fill under paper so cuts read clearly (dark desk on light paper)
     ctx.save()
     clipPaper(ctx)
-    ctx.fillStyle = TABLE
+    ctx.fillStyle = holeFill()
     ctx.fillRect(0, 0, SIZE, SIZE)
     const n = state.sectors
     const cx = SIZE / 2, cy = SIZE / 2
     const u = Math.max(0, Math.min(1, state.unfoldT ?? 1))
     const theta = (Math.PI * 2) / n
     const spread = 0.15 + 0.85 * u
-    const altMirror = state.symmetryMode !== "rotate"
+    const altMirror = true // always alt-mirror (true fold geometry)
     // n copies (not 2n). even = R(iθ); odd = R((i+1)θ)∘M_vertical
     // so adjacent sectors are mirrors and every sector is filled
     const maxI = Math.max(1, Math.round(1 + (n - 1) * u))
@@ -415,7 +426,7 @@ export function createPapercutApp(root) {
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.save()
     clipPaper(ctx)
-    ctx.fillStyle = TABLE
+    ctx.fillStyle = holeFill()
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.restore()
     // inactive sectors: stacked muted paper so the bright cell reads as the folded pile
@@ -467,8 +478,8 @@ export function createPapercutApp(root) {
         <button type="button" data-shape="circle" class="secondary ${state.shape==="circle"?"active":""}">圓形（團花）</button></div>
         <div class="row"><h2>紙色</h2>
         <button type="button" class="ghost tone" data-tone="#c41e3a" style="background:#c41e3a;color:#fff">硃紅</button>
-        <button type="button" class="ghost tone" data-tone="#f7efe2" style="background:#f7efe2;color:#2c2420">宣紙</button>
-        <button type="button" class="ghost tone" data-tone="#fff8e7" style="background:#fff8e7;color:#2c2420">米黄</button>
+        <button type="button" class="ghost tone" data-tone="#efe6d4" style="background:#efe6d4;color:#2c2420">宣紙</button>
+        <button type="button" class="ghost tone" data-tone="#f3e4c8" style="background:#f3e4c8;color:#2c2420">米黄</button>
         <button type="button" class="ghost tone" data-tone="#f3d9de" style="background:#f3d9de;color:#2c2420">淡粉</button>
         <button type="button" class="ghost tone" data-tone="#dceee6" style="background:#dceee6;color:#2c2420">淡青</button></div>`
       controls.querySelectorAll("[data-shape]").forEach((b) => {
@@ -501,32 +512,14 @@ export function createPapercutApp(root) {
         resetWedge(); state.step = "cut"; render()
       }
     } else if (state.step === "cut") {
-      const altOn = state.symmetryMode !== "rotate"
+      state.mode = "cut"
+      state.symmetryMode = "alt-mirror"
       controls.innerHTML = `<div class="row"><h2>工具</h2>
-        <button type="button" id="cutBtn" class="${state.mode==="cut"?"primary":"ghost"}">剪刀</button>
-        <button type="button" id="stampBtn" class="${state.mode==="stamp"?"primary":"ghost"}">印章</button>
-        <button type="button" class="ghost" data-stamp="circle">圓孔</button>
-        <button type="button" class="ghost" data-stamp="crescent">月牙</button>
-        <button type="button" class="ghost" data-stamp="teardrop">水滴</button>
+        <button type="button" id="cutBtn" class="primary">剪刀</button></div>
+        <div class="row">
         <button type="button" class="ghost" id="undo">復原</button>
-        <button type="button" class="ghost" id="clear">全部重來</button></div>
-        <div class="row"><h2>對稱</h2>
-        <button type="button" id="symAlt" class="${altOn?"primary":"ghost"}">交替鏡射（似真摺紙）</button>
-        <button type="button" id="symRot" class="${!altOn?"primary":"ghost"}">淨旋轉（疎啲）</button></div>
-        <details class="more-tools">
-          <summary>示範圖案</summary>
-          <div class="row" style="margin-top:0.5rem">
-            <button type="button" class="secondary" data-demo="petal">花瓣</button>
-            <button type="button" class="secondary" data-demo="edge">齒邊</button>
-            <button type="button" class="secondary" data-demo="star">星點</button>
-            <button type="button" class="secondary" data-demo="heart">心形</button>
-            <button type="button" class="secondary" data-demo="lattice">窗格</button>
-            <button type="button" class="secondary" data-demo="snow">雪花</button>
-          </div>
-        </details>`
+        <button type="button" class="ghost" id="clear">重新再來</button></div>`
       controls.querySelector("#cutBtn").onclick = () => { state.mode = "cut"; renderControls(); drawView() }
-      const stampBtn = controls.querySelector("#stampBtn")
-      if (stampBtn) stampBtn.onclick = () => { state.mode = "stamp"; renderControls(); drawView() }
       controls.querySelector("#undo").onclick = () => {
         const prev = state.history.pop(); if (!prev) return
         const img = new Image()
@@ -534,18 +527,7 @@ export function createPapercutApp(root) {
         img.src = prev
       }
       controls.querySelector("#clear").onclick = () => { snapshot(); resetWedge(); drawView() }
-      controls.querySelector("#symAlt").onclick = () => { state.symmetryMode = "alt-mirror"; renderControls(); drawView() }
-      controls.querySelector("#symRot").onclick = () => { state.symmetryMode = "rotate"; renderControls(); drawView() }
-      controls.querySelectorAll("[data-stamp]").forEach((b) => {
-        b.onclick = () => { state.stamp = b.dataset.stamp; state.mode = "stamp"; renderControls(); drawView() }
-        if (state.mode === "stamp" && b.dataset.stamp === state.stamp) b.classList.add("active")
-      })
-      controls.querySelectorAll("[data-demo]").forEach((b) => {
-        b.onclick = () => { applyDemoPattern(b.dataset.demo); drawView() }
-      })
-      hint.textContent = state.mode === "stamp"
-        ? "喺扇形一叠撳一下打窿。虛線係摺邊；畫面係摺起嗰一叠扇形。左下角小窗即時展開。"
-        : "虛線係摺邊；畫面係摺起嗰一叠扇形。圍成圈放手＝豆／葉形窿；輕輕一劃＝剪一刀。左下角係展開預覽（幾何複製，唔係評分）。"
+      hint.textContent = "虛線係摺邊；畫面係摺起嗰一叠扇形。圍成圈放手＝豆／葉形窿；輕輕一劃＝剪一刀。左下角係展開預覽（幾何複製，唔係評分）。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">預覽成品</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
@@ -567,7 +549,7 @@ export function createPapercutApp(root) {
     } else {
       controls.innerHTML = `<div class="row"><h2>成品</h2>
         <span style="color:var(--muted)">${state.sectors} 等份對稱 · 可下載或返回再剪</span></div>`
-      hint.textContent = `把亮格複製成 ${state.sectors} 等份（${state.symmetryMode === "rotate" ? "淨旋轉" : "隔格鏡射"}）。拖住可轉。夠美就下載貼簿。`
+      hint.textContent = `按你摺嘅次數展開成 ${state.sectors} 等份。拖住可轉。夠美就下載貼簿。`
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
         <button type="button" class="secondary" id="cam">相機擺放（簡易）</button>
