@@ -3,6 +3,7 @@ let PAPER = "#f7efe2"
 const TABLE = "#c4a574" // shows through cuts
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
+const APP_VERSION = "v20260906-heavy"
 
 export function createPapercutApp(root) {
   const state = {
@@ -20,6 +21,7 @@ export function createPapercutApp(root) {
     showLivePreview: true,
     unfoldT: 1, // 0..1 animated unfold
     paperTone: "#f7efe2",
+    symmetryMode: "alt-mirror", // alt-mirror | rotate
   }
 
   const wedge = document.createElement("canvas")
@@ -29,17 +31,21 @@ export function createPapercutApp(root) {
 
   root.innerHTML = `
     <div class="app" data-app="papercut">
-      <header>
-        <h1>剪紙 · 對稱創作</h1>
-        <p>一格剪完，對稱展開成窗花／團花——比真紙更易重試</p>
+      <header class="app-header">
+        <div>
+          <h1>剪紙 · 對稱創作</h1>
+          <p>一格剪完，按摺痕幾何展開成窗花／團花——唔係 AI 評分</p>
+        </div>
+        <span class="ver-chip" title="硬 refresh 後應見到呢個版號">${APP_VERSION}</span>
       </header>
       <details class="tip-card" open>
         <summary>課堂 5 分鐘點用</summary>
         <ol>
           <li>選圓形或方形</li>
           <li>摺 2～3 次（夠對稱又唔難）</li>
-          <li>喺亮格剪／印章打窿，或撳示範圖案</li>
-          <li>右上角睇小「展開」，再撳「預覽成品」</li>
+          <li>喺亮格圍一圈放手＝封閉剪口，或印章打窿</li>
+          <li>左下角睇小「展開」，再撳「預覽成品」</li>
+          <li>展開睇落會密好多、同單格唔一樣——呢個就係摺紙對稱，電腦冇改你剪嘅形</li>
         </ol>
       </details>
       <div class="panel">
@@ -49,8 +55,9 @@ export function createPapercutApp(root) {
           <div class="stage tilt-wrap" id="tiltWrap">
             <canvas id="view" width="${SIZE}" height="${SIZE}" role="img" aria-label="剪紙畫布"></canvas>
             <div class="preview-stage mini hidden" id="previewWrap">
-              <div class="preview-label">展開</div>
+              <div class="preview-label" id="previewLabel">展開</div>
               <canvas id="preview" width="${SIZE}" height="${SIZE}" role="img" aria-label="展開預覽"></canvas>
+              <div class="preview-caption">幾何展開 · 唔係評分</div>
             </div>
           </div>
         </div>
@@ -231,15 +238,23 @@ export function createPapercutApp(root) {
     const n = state.sectors
     const cx = SIZE / 2, cy = SIZE / 2
     const u = Math.max(0, Math.min(1, state.unfoldT ?? 1))
-    // POC: n copies; even = rotate, odd = mirror then rotate
+    const theta = (Math.PI * 2) / n
+    const spread = 0.15 + 0.85 * u
+    const altMirror = state.symmetryMode !== "rotate"
+    // n copies (not 2n). even = R(iθ); odd = R((i+1)θ)∘M_vertical
+    // so adjacent sectors are mirrors and every sector is filled
     const maxI = Math.max(1, Math.round(1 + (n - 1) * u))
     for (let i = 0; i < maxI; i++) {
       ctx.save()
       ctx.translate(cx, cy)
-      ctx.rotate((i * Math.PI * 2) / n * (0.2 + 0.8 * u))
-      if (i % 2 === 1 && u > 0.35) ctx.scale(-1, 1)
+      if (altMirror && i % 2 === 1) {
+        ctx.rotate((i + 1) * theta * spread)
+        ctx.scale(-1, 1)
+      } else {
+        ctx.rotate(i * theta * spread)
+      }
       ctx.translate(-cx, -cy)
-      ctx.globalAlpha = 0.4 + 0.6 * u
+      ctx.globalAlpha = 0.45 + 0.55 * u
       ctx.drawImage(wedge, 0, 0)
       ctx.restore()
     }
@@ -264,7 +279,7 @@ export function createPapercutApp(root) {
     ctx.fillStyle = TABLE
     ctx.fillRect(0, 0, SIZE, SIZE)
     ctx.restore()
-    // inactive sectors: muted paper
+    // inactive sectors: stacked muted paper so the bright cell reads as the folded pile
     const n = state.sectors, cx = SIZE / 2, cy = SIZE / 2
     for (let i = 1; i < n; i++) {
       ctx.save()
@@ -274,7 +289,7 @@ export function createPapercutApp(root) {
       ctx.save()
       clipSector(ctx, n)
       clipPaper(ctx)
-      ctx.fillStyle = "#e8d9c8"
+      ctx.fillStyle = i % 2 ? "#e2d2be" : "#eadcc8"
       ctx.fillRect(0, 0, SIZE, SIZE)
       ctx.restore()
       ctx.restore()
@@ -346,23 +361,34 @@ export function createPapercutApp(root) {
         resetWedge(); state.step = "cut"; render()
       }
     } else if (state.step === "cut") {
+      const altOn = state.symmetryMode !== "rotate"
       controls.innerHTML = `<div class="row"><h2>工具</h2>
         <button type="button" id="cutBtn" class="${state.mode==="cut"?"primary":"ghost"}">剪刀</button>
-        <button type="button" id="stampBtn" class="${state.mode==="stamp"?"primary":"ghost"}">印章</button>
         <button type="button" class="ghost" id="undo">復原</button>
-        <button type="button" class="ghost" id="clear">全部重來剪口</button></div>
-        <div class="row"><h2>示範圖案</h2>
-        <button type="button" class="secondary" data-demo="petal">花瓣</button>
-        <button type="button" class="secondary" data-demo="edge">齒邊</button>
-        <button type="button" class="secondary" data-demo="star">星點</button>
-        <button type="button" class="secondary" data-demo="heart">心形</button>
-        <button type="button" class="secondary" data-demo="lattice">窗格</button>
-        <button type="button" class="secondary" data-demo="snow">雪花</button>
-        <button type="button" class="ghost" data-stamp="circle">圓孔</button>
-        <button type="button" class="ghost" data-stamp="triangle">三角</button>
-        <button type="button" class="ghost" data-stamp="diamond">菱形</button></div>`
+        <button type="button" class="ghost" id="clear">全部重來</button></div>
+        <div class="row"><h2>對稱</h2>
+        <button type="button" id="symAlt" class="${altOn?"primary":"ghost"}">交替鏡射（似真摺紙）</button>
+        <button type="button" id="symRot" class="${!altOn?"primary":"ghost"}">淨旋轉（疏啲）</button></div>
+        <details class="more-tools">
+          <summary>更多工具（印章／示範）</summary>
+          <div class="row" style="margin-top:0.5rem">
+            <button type="button" id="stampBtn" class="${state.mode==="stamp"?"primary":"ghost"}">印章</button>
+            <button type="button" class="ghost" data-stamp="circle">圓孔</button>
+            <button type="button" class="ghost" data-stamp="triangle">三角</button>
+            <button type="button" class="ghost" data-stamp="diamond">菱形</button>
+          </div>
+          <div class="row">
+            <button type="button" class="secondary" data-demo="petal">花瓣</button>
+            <button type="button" class="secondary" data-demo="edge">齒邊</button>
+            <button type="button" class="secondary" data-demo="star">星點</button>
+            <button type="button" class="secondary" data-demo="heart">心形</button>
+            <button type="button" class="secondary" data-demo="lattice">窗格</button>
+            <button type="button" class="secondary" data-demo="snow">雪花</button>
+          </div>
+        </details>`
       controls.querySelector("#cutBtn").onclick = () => { state.mode = "cut"; renderControls(); drawView() }
-      controls.querySelector("#stampBtn").onclick = () => { state.mode = "stamp"; renderControls(); drawView() }
+      const stampBtn = controls.querySelector("#stampBtn")
+      if (stampBtn) stampBtn.onclick = () => { state.mode = "stamp"; renderControls(); drawView() }
       controls.querySelector("#undo").onclick = () => {
         const prev = state.history.pop(); if (!prev) return
         const img = new Image()
@@ -370,16 +396,18 @@ export function createPapercutApp(root) {
         img.src = prev
       }
       controls.querySelector("#clear").onclick = () => { snapshot(); resetWedge(); drawView() }
+      controls.querySelector("#symAlt").onclick = () => { state.symmetryMode = "alt-mirror"; renderControls(); drawView() }
+      controls.querySelector("#symRot").onclick = () => { state.symmetryMode = "rotate"; renderControls(); drawView() }
       controls.querySelectorAll("[data-stamp]").forEach((b) => {
-        b.onclick = () => { state.stamp = b.dataset.stamp; state.mode = "stamp"; renderControls() }
+        b.onclick = () => { state.stamp = b.dataset.stamp; state.mode = "stamp"; renderControls(); drawView() }
         if (state.mode === "stamp" && b.dataset.stamp === state.stamp) b.classList.add("active")
       })
       controls.querySelectorAll("[data-demo]").forEach((b) => {
         b.onclick = () => { applyDemoPattern(b.dataset.demo); drawView() }
       })
       hint.textContent = state.mode === "stamp"
-        ? "印章：喺亮格撳一下打窿。右上角小「展開」即時更新。"
-        : "用手指喺亮格畫一筆，放手就變成封閉剪口（似原裝）。右上角睇展開。"
+        ? "喺亮格撳一下打窿。左下角小窗即時按摺數鋪滿成圈（幾何複製，唔係評分）。"
+        : "亮格係摺起嗰一叠。圍成圈放手＝豆／葉形窿；輕輕一劃＝剪一刀。左下角係按摺痕複製，同亮格睇落唔同係正常，唔係 AI 判定。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">預覽成品</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
@@ -401,7 +429,7 @@ export function createPapercutApp(root) {
     } else {
       controls.innerHTML = `<div class="row"><h2>成品</h2>
         <span style="color:var(--muted)">${state.sectors} 等份對稱 · 可下載或返回再剪</span></div>`
-      hint.textContent = "成品會輕輕轉；拖住可以自己轉，又會有輕微立體傾斜。夠美就下載貼簿。"
+      hint.textContent = `把亮格複製成 ${state.sectors} 等份（${state.symmetryMode === "rotate" ? "淨旋轉" : "隔格鏡射"}）。拖住可轉。夠美就下載貼簿。`
       actions.innerHTML = `<button type="button" class="ghost" id="back">返回再剪</button>
         <button type="button" class="secondary" id="restart">全部重來</button>
         <button type="button" class="secondary" id="cam">相機擺放（簡易）</button>
@@ -501,26 +529,39 @@ export function createPapercutApp(root) {
       vctx.closePath()
       vctx.stroke()
       vctx.restore()
-      // dashed live stroke while drawing (POC feel)
+      // dashed live stroke + ghost of the hole that will punch on release
       if (state.strokePts && state.strokePts.length > 1) {
         vctx.save()
         clipSector(vctx, state.sectors)
         clipPaper(vctx)
+        const pts = state.strokePts
+        const first = pts[0], last = pts[pts.length - 1]
+        const dist = Math.hypot(last.x - first.x, last.y - first.y)
+        if (pts.length >= 6 && dist < 48) {
+          vctx.fillStyle = "rgba(44,36,32,0.16)"
+          vctx.beginPath()
+          vctx.moveTo(first.x, first.y)
+          for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
+          vctx.closePath()
+          vctx.fill()
+        }
         vctx.strokeStyle = "rgba(44,36,32,0.85)"
         vctx.lineWidth = 3
         vctx.setLineDash([8, 6])
         vctx.lineCap = "round"
         vctx.lineJoin = "round"
         vctx.beginPath()
-        vctx.moveTo(state.strokePts[0].x, state.strokePts[0].y)
-        for (let i = 1; i < state.strokePts.length; i++) {
-          vctx.lineTo(state.strokePts[i].x, state.strokePts[i].y)
-        }
+        vctx.moveTo(pts[0].x, pts[0].y)
+        for (let i = 1; i < pts.length; i++) vctx.lineTo(pts[i].x, pts[i].y)
         vctx.stroke()
         vctx.setLineDash([])
         vctx.restore()
       }
-      if (state.showLivePreview) { const u = state.unfoldT; state.unfoldT = 1; composeFull(pctx); state.unfoldT = u }
+      if (state.showLivePreview) {
+        const lab = root.querySelector("#previewLabel")
+        if (lab) lab.textContent = `展開 · ${state.sectors} 等份`
+        const u = state.unfoldT; state.unfoldT = 1; composeFull(pctx); state.unfoldT = u
+      }
     } else {
       vctx.save()
       vctx.fillStyle = "#efe6d8"
@@ -586,25 +627,61 @@ export function createPapercutApp(root) {
     return cur
   }
 
+  function pathLength(pts) {
+    let len = 0
+    for (let i = 1; i < pts.length; i++) {
+      len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y)
+    }
+    return len
+  }
+
   function commitClosedCut(pts) {
-    if (!pts || pts.length < 3) return
-    // if path nearly open, close to first point
+    if (!pts || pts.length < 2) return
     const first = pts[0], last = pts[pts.length - 1]
     const dist = Math.hypot(last.x - first.x, last.y - first.y)
-    let path = pts.slice()
-    if (dist > 12) path.push({ x: first.x, y: first.y })
-    path = smoothClosePath(path)
+    const len = pathLength(pts)
+    if (len < 16 && dist < 16) {
+      // accidental tap → small punch, matches "打窿" classroom feel
+      snapshot()
+      wctx.save()
+      clipSector(wctx, state.sectors)
+      clipPaper(wctx)
+      wctx.globalCompositeOperation = "destination-out"
+      wctx.fillStyle = "#000"
+      wctx.beginPath()
+      wctx.arc(first.x, first.y, Math.max(8, state.brush * 0.45), 0, Math.PI * 2)
+      wctx.fill()
+      wctx.restore()
+      return
+    }
+    const nearLoop = dist < Math.max(24, 0.22 * len) && pts.length >= 6
     snapshot()
     wctx.save()
     clipSector(wctx, state.sectors)
     clipPaper(wctx)
     wctx.globalCompositeOperation = "destination-out"
     wctx.fillStyle = "#000"
-    wctx.beginPath()
-    wctx.moveTo(path[0].x, path[0].y)
-    for (let i = 1; i < path.length; i++) wctx.lineTo(path[i].x, path[i].y)
-    wctx.closePath()
-    wctx.fill()
+    wctx.strokeStyle = "#000"
+    wctx.lineCap = "round"
+    wctx.lineJoin = "round"
+    if (nearLoop || (pts.length >= 3 && dist < 36)) {
+      // POC feel: release a loop → smooth bean/leaf hole
+      let path = pts.slice()
+      if (dist > 8) path.push({ x: first.x, y: first.y })
+      path = smoothClosePath(path)
+      wctx.beginPath()
+      wctx.moveTo(path[0].x, path[0].y)
+      for (let i = 1; i < path.length; i++) wctx.lineTo(path[i].x, path[i].y)
+      wctx.closePath()
+      wctx.fill()
+    } else {
+      // open scratch → thick knife cut, do NOT fill a giant triangle
+      wctx.lineWidth = Math.max(16, state.brush)
+      wctx.beginPath()
+      wctx.moveTo(pts[0].x, pts[0].y)
+      for (let i = 1; i < pts.length; i++) wctx.lineTo(pts[i].x, pts[i].y)
+      wctx.stroke()
+    }
     wctx.restore()
   }
 
