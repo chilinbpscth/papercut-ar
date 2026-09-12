@@ -198,7 +198,19 @@ button:active:not(:disabled){filter:brightness(.92);}
 #arlive-rotation{position:absolute;left:12px;bottom:calc(78px + env(safe-area-inset-bottom));width:min(320px,calc(100% - 24px));pointer-events:auto;}
 #viewer-rotation{margin-top:8px;}#ar-body{min-height:120px;}.ar-sheet{height:min(94dvh,820px);}
 #lesson-panel.needs-answer{border:2px solid var(--gold);box-shadow:0 0 0 3px #a57b2e18;}
-.answer-prompt{display:block;margin:6px 0;padding:8px 10px;border-radius:8px;background:var(--ground);color:var(--ink);font-weight:600;}
+#lesson-panel .lesson-row>div{flex:1;min-width:0;}
+.answer-box{margin-top:10px;padding:14px;border:2px solid var(--gold);border-radius:12px;background:var(--ground);}
+.answer-prompt{display:flex;align-items:center;gap:12px;margin-bottom:12px;color:var(--ink);}
+.answer-prompt strong{display:block;font-size:18px;}.answer-prompt span:not(.answer-hand){display:block;font-size:13px;}
+.answer-hand{font-size:38px;line-height:1;animation:answerPoint .8s ease-in-out 4 alternate;}
+.answer-alert{margin-left:auto;display:grid;place-items:center;flex-shrink:0;width:28px;height:28px;border-radius:50%;background:var(--gold);color:var(--ground);font-size:20px;}
+#lesson-panel .answer-box .lesson-actions{display:grid;grid-template-columns:1fr;gap:9px;}
+#lesson-panel .answer-box button{text-align:left;min-height:48px;border:2px solid var(--gold);font-weight:600;}
+#lesson-panel .answer-box button::before{content:'○';margin-right:10px;color:var(--gold);}
+#lesson-panel .answer-box button:hover,#lesson-panel .answer-box button:focus-visible{background:var(--surface);outline:2px solid var(--gold);outline-offset:2px;}
+@keyframes answerPoint{to{transform:translateY(6px);}}
+@media(prefers-reduced-motion:reduce){.answer-hand{animation:none;}}
+@media(max-height:650px){#lesson-panel.needs-answer{max-height:45dvh;}}
 @media(max-height:650px){.rotation-sphere{width:62px;height:62px;}.rotation-globe{width:52px;height:52px;}.rotation-panel{padding:6px;}.rotation-options p,.rotation-values{display:none;}}
 </style>
 <div id="app">
