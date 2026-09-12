@@ -16,7 +16,7 @@
   let modulesAdded = false;
   let running = false;
   let trackingOk = false, placed = false;
-  let paper = null, lastSurfaceY = null;
+  let paper = null, lastSurfaceY = null, rotationControl = null;
   const SURFACE_TYPES = ['DETECTED_SURFACE', 'ESTIMATED_SURFACE'];
 
   /* ---------- script 懶載入 ---------- */
@@ -109,13 +109,14 @@
       [...SURFACE_TYPES, 'FEATURE_POINT']) || [];
     const good = raw
       .map(h => ({ ...h, d: Math.hypot(h.position.x - cam.x, h.position.y - cam.y, h.position.z - cam.z) }))
-      .filter(h => h.d > 0.3 && h.d < 4 && h.position.y < cam.y - 0.1)
+      .filter(h => h.d > 0.3 && h.d < 4)
       .sort((a, b) =>
         (SURFACE_TYPES.includes(a.type) ? 0 : 1) - (SURFACE_TYPES.includes(b.type) ? 0 : 1) ||
         a.d - b.d);
     if (good.length){
       const p = good[0].position;
-      paper.position.set(p.x, p.y + 0.005, p.z);
+      paper.position.set(p.x, p.y, p.z);
+      paper.position.addScaledVector(new THREE.Vector3(0,0,1).applyQuaternion(paper.quaternion), .005);
       lastSurfaceY = p.y;
     } else {
       if (!_plane){
@@ -123,11 +124,15 @@
         _raycaster = new THREE.Raycaster();
         _hit = new THREE.Vector3();
       }
-      _plane.constant = -(lastSurfaceY ?? 0);
+      const normal = new THREE.Vector3(0,0,1).applyQuaternion(paper.quaternion);
+      if (Math.abs(normal.y) < .5){
+        const anchor = placed ? paper.position.clone() : camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(1.5));
+        _plane.setFromNormalAndCoplanarPoint(normal, anchor);
+      } else _plane.set(new THREE.Vector3(0,1,0), -(lastSurfaceY ?? 0));
       _raycaster.setFromCamera(
         { x: (x / innerWidth) * 2 - 1, y: -(y / innerHeight) * 2 + 1 }, camera);
       if (!_raycaster.ray.intersectPlane(_plane, _hit)) return;
-      paper.position.set(_hit.x, (lastSurfaceY ?? 0) + 0.005, _hit.z);
+      paper.position.copy(_hit).addScaledVector(normal, .005);
     }
     paper.visible = true;
     if (!placed){
@@ -141,7 +146,7 @@
   const STATUS_TEXT = {
     scanning: '慢慢咁郁吓部機，影住張檯或者地下～ 📱',
     ready: '得喇！㩒一下想擺剪紙嘅位置 👆',
-    placed: '好靚呀！行近啲、繞住佢睇吓，影返張相留念啦 📷',
+    placed: '擺好喇！拖動角度球，或按「貼牆 90°」調整作品，再影相 📷',
   };
   function setStatus(key){
     $('#arlive-status').textContent = STATUS_TEXT[key] || '';
@@ -181,6 +186,12 @@
     }
     const canvasTex = await __paperAR.renderTextureCanvas();
     paper = makePaperMesh(canvasTex);
+    rotationControl?.destroy();
+    rotationControl = mountRotationControls($('#arlive-rotation'), angles => {
+      const rad = Math.PI / 180;
+      paper.quaternion.setFromEuler(new THREE.Euler(angles.pitch*rad, angles.yaw*rad, angles.roll*rad, 'YXZ'));
+      paper.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), -Math.PI/2));
+    });
     placed = false; trackingOk = false; lastSurfaceY = null;
     if (!modulesAdded){
       XR8.XrController.configure({ scale: 'absolute', enableWorldPoints: false });
@@ -207,6 +218,7 @@
   }
 
   function closeLive(){
+    rotationControl?.destroy(); rotationControl = null;
     if (running){ try { XR8.stop(); } catch (_) {} running = false; }
     if (paper){
       const { scene } = XR8.Threejs.xrScene() || {};
