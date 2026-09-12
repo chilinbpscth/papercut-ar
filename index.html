@@ -208,9 +208,12 @@ button:active:not(:disabled){filter:brightness(.92);}
 #lesson-panel .answer-box button{text-align:left;min-height:48px;border:2px solid var(--gold);font-weight:600;}
 #lesson-panel .answer-box button::before{content:'○';margin-right:10px;color:var(--gold);}
 #lesson-panel .answer-box button:hover,#lesson-panel .answer-box button:focus-visible{background:var(--surface);outline:2px solid var(--gold);outline-offset:2px;}
+#lesson-panel .start-box button{font-size:18px;text-align:center;}
+#lesson-panel .start-box button::before{content:none;}
+#lesson-panel .start-box button:hover,#lesson-panel .start-box button:focus-visible{background:var(--red);}
 @keyframes answerPoint{to{transform:translateY(6px);}}
 @media(prefers-reduced-motion:reduce){.answer-hand{animation:none;}}
-@media(max-height:650px){#lesson-panel.needs-answer{max-height:45dvh;}}
+@media(max-height:650px){#lesson-panel.needs-answer,#lesson-panel:has(.start-box){max-height:45dvh;}}
 @media(max-height:650px){.rotation-sphere{width:62px;height:62px;}.rotation-globe{width:52px;height:52px;}.rotation-panel{padding:6px;}.rotation-options p,.rotation-values{display:none;}}
 </style>
 <div id="app">
