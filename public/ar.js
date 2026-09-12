@@ -280,7 +280,7 @@ if (typeof document !== 'undefined' && document.querySelector('#btn-ar')){
   const body = document.querySelector('#ar-body');
   const hint = document.querySelector('#ar-hint');
   const btnEnter = document.querySelector('#ar-enter');
-  let mvReady = null, urls = [];
+  let mvReady = null, urls = [], rotationControl = null;
 
   function cleanupURLs(){
     urls.forEach(u => URL.revokeObjectURL(u));
@@ -294,13 +294,13 @@ if (typeof document !== 'undefined' && document.querySelector('#btn-ar')){
       if (!mvReady) mvReady = import('./vendor/model-viewer.min.js');
       const [png] = await Promise.all([buildTexturePNG(), mvReady]);
       const glbURL = URL.createObjectURL(new Blob([buildGLB(png)], { type: 'model/gltf-binary' }));
-      const usdzURL = URL.createObjectURL(new Blob([buildUSDZ(png)], { type: 'model/vnd.usdz+zip' }));
+
       cleanupURLs();
-      urls = [glbURL, usdzURL];
+      urls = [glbURL];
       body.innerHTML = '';
       const mv = document.createElement('model-viewer');
       mv.setAttribute('src', glbURL);
-      mv.setAttribute('ios-src', usdzURL);
+      // Let model-viewer export the current orientation for iOS Quick Look.
       mv.setAttribute('ar', '');
       mv.setAttribute('ar-modes', 'webxr quick-look');
       mv.setAttribute('ar-scale', 'fixed');
@@ -309,12 +309,16 @@ if (typeof document !== 'undefined' && document.querySelector('#btn-ar')){
       mv.setAttribute('shadow-intensity', '1');
       mv.setAttribute('alt', '剪紙成品 3D 模型');
       body.appendChild(mv);
+      rotationControl?.destroy();
+      rotationControl = mountRotationControls(document.querySelector('#viewer-rotation'), angles => {
+        mv.setAttribute('orientation', `${angles.roll}deg ${angles.pitch}deg ${angles.yaw}deg`);
+      });
       await new Promise((res, rej) => {
         mv.addEventListener('load', res, { once: true });
         mv.addEventListener('error', e => rej(new Error('model load error')), { once: true });
       });
       if (mv.canActivateAR){
-        hint.textContent = '實物尺寸 20 cm × 20 cm，可貼牆或平放檯面。';
+        hint.textContent = '作品約 20 cm。先用角度球調整方向，再進入 AR；貼牆角度需手動對齊。';
         btnEnter.disabled = false;
         btnEnter.onclick = () => mv.activateAR();
       } else {
@@ -328,6 +332,7 @@ if (typeof document !== 'undefined' && document.querySelector('#btn-ar')){
   }
   globalThis.__paperAR.openViewerAR = openAR;   /* ar-live.js 後備入口 */
   document.querySelector('#ar-close').addEventListener('click', () => {
+    rotationControl?.destroy(); rotationControl = null;
     modal.hidden = true;
     body.innerHTML = '';       /* 停止 WebGL context */
     cleanupURLs();

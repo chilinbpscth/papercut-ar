@@ -4,7 +4,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const root=path.join(__dirname,'../public');
 function app(){
  const nodes=new Map();
- function node(id){if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',style:{},handlers:{},classList:{add(){},remove(){}},addEventListener(type,fn){(this.handlers[type]??=[]).push(fn);},setAttribute(){},appendChild(){},remove(){},setPointerCapture(){},getBoundingClientRect(){return {};},getScreenCTM(){return {a:1,b:0,inverse(){return {};}};}});return nodes.get(id);}
+ function node(id){if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',style:{},handlers:{},classList:{add(){},remove(){}},addEventListener(type,fn){(this.handlers[type]??=[]).push(fn);},setAttribute(){},scrollIntoView(){},focus(){},appendChild(){},remove(){},setPointerCapture(){},getBoundingClientRect(){return {};},getScreenCTM(){return {a:1,b:0,inverse(){return {};}};}});return nodes.get(id);}
  const doc={querySelector:node,querySelectorAll:()=>[],createElementNS:()=>node(Symbol())};
  const context=vm.createContext({document:doc,CutGeometry:require('./load-geometry.cjs'),console,setTimeout:()=>{},DOMPoint:class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(){return this;}}});
  const inline=fs.readFileSync(path.join(root,'../index.html'),'utf8').match(/<script>([\s\S]*?)<\/script>/)[1];
@@ -61,4 +61,14 @@ for(let id=1;id<4;id++)test(`advanced lesson ${id+1}: all guided cuts, progress,
  const points=a.run('guidePoints()');a.emit('pointerdown',points[0]);for(const p of points.slice(1))a.emit('pointermove',p);a.emit('pointerup',points.at(-1));
  assert.equal(a.run('state.cuts.length'),steps);assert.equal(a.run('state.lesson.phase'),'predict');
  assert(a.run('Math.abs(G.area(lessonDesign(state.lesson.id).remaining)-G.area(state.remaining))')<.01);
+});
+
+test('preview button points to unanswered question and reveals after an answer',()=>{
+ const a=app();a.run("startLesson();state.lesson.phase='predict';render()");
+ assert.equal(a.node('#btn-mode').disabled,false);
+ assert(a.node('#lesson-panel').innerHTML.includes('請按下面其中一個答案'));
+ a.click('#btn-mode');assert.equal(a.run('state.mode'),'cut');
+ assert(a.node('#hint').textContent.includes('答案'));
+ a.run('state.lesson.guess=1');a.click('#btn-mode');
+ assert.equal(a.run('state.mode'),'preview');assert.equal(a.run('state.lesson.phase'),'done');
 });

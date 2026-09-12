@@ -21,7 +21,8 @@ function guidePoints(){return currentStep().guide();}
 function targetFlower(){return lessonTarget(state.lesson?.id ?? 0);}
 function lessonPanel(){
   const panel=$('#lesson-panel'),lesson=state.lesson;
-  panel.hidden=!lesson;if(!lesson)return;
+  panel.hidden=!lesson;panel.classList.remove('needs-answer');if(!lesson)return;
+  if(lesson.phase==='predict')panel.classList.add('needs-answer');
   const course=currentLesson();
   let heading='',body='',actions='';
   const button=(action,label,primary=false)=>`<button data-action="${action}" class="${primary?'primary':''}">${label}</button>`;
@@ -37,7 +38,7 @@ function lessonPanel(){
       actions=button('next-cut','下一步',true);
     }
   }else if(lesson.phase==='predict'){
-    heading='全部剪好了！想一想';body=course.question;
+    heading='最後一步：揀答案，再睇作品';body='<span class="answer-prompt">👇 請按下面其中一個答案</span>'+course.question;
     actions=course.choices.map((text,i)=>button('guess-'+i,text)).join('');
     if(lesson.guess!==undefined){
       body+=`<p class="prediction">${lesson.guess===course.answer?'答啱了！':'一齊睇返剪法：'} ${course.explain}</p>`;
@@ -83,7 +84,7 @@ render=function(){
     if(state.pending.length)$('#hint').textContent='仲未剪斷。由剪刀尖接住剪，接通紙邊先會甩。';
   }
   $('#btn-mode').disabled=!!(state.lesson&&['intro','cut','between'].includes(state.lesson.phase));
-  if(state.lesson?.phase==='predict'){$('#btn-mode').disabled=true;$('#btn-mode').textContent='先估一估';}
+  if(state.lesson?.phase==='predict'){$('#btn-mode').disabled=false;$('#btn-mode').textContent=state.lesson.guess===undefined?'先揀上面嘅答案 ↑':'展開作品';$('#hint').textContent='仲有一步：按上面其中一個答案，就可以展開作品。';}
   $('#btn-clear').disabled=!(state.pending.length||state.cuts.length);
   $('#back-folds').textContent=state.lesson?'‹ 返回':'‹ 摺法';
 };
@@ -101,7 +102,7 @@ $('#lesson-panel').addEventListener('click',e=>{
   const action=e.target.closest('button')?.dataset.action;
   if(!action)return;
   if(action==='begin'||action==='next-cut'){state.lesson.phase='cut';render();}
-  if(action.startsWith('guess-')){state.lesson.guess=Number(action.slice(6));lessonPanel();}
+  if(action.startsWith('guess-')){state.lesson.guess=Number(action.slice(6));render();$('#hint').textContent='答好了！按「展開睇作品」或右下角「展開作品」。';}
   if(action==='reveal'){state.lesson.phase='done';state.mode='preview';render();animateReveal();}
   if(action==='courses')show('#s-lessons');
   if(action==='retry'){startLesson(state.lesson.id);state.lesson.phase='cut';render();}
@@ -114,6 +115,12 @@ function animateReveal(){
   svg.classList.remove('reveal');void svg.getBoundingClientRect();svg.classList.add('reveal');
 }
 function togglePreview(){
+  if(state.lesson?.phase==='predict'){
+    if(state.lesson.guess!==undefined){state.lesson.phase='done';state.mode='preview';render();animateReveal();return;}
+    $('#lesson-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+    $('#lesson-panel button')?.focus({preventScroll:true});
+    $('#hint').textContent='請先按上面的答案按鈕，再展開作品。';return;
+  }
   if(state.lesson&&['intro','cut','between','predict'].includes(state.lesson.phase))return;
   state.mode=state.mode==='cut'?'preview':'cut';render();
   if(state.mode==='preview'){
@@ -183,7 +190,7 @@ function moveBlade(e){
     state.pending=[];activePointer=null;
     if(state.lesson)state.lesson.phase=state.cuts.length<currentLesson().steps.length?'between':'predict';
     render();
-    $('#hint').textContent='剪斷了！較細塊紙掉落，留下的部分會組成作品。';
+    $('#hint').textContent=state.lesson?.phase==='predict'?'剪好了！請按上面其中一個答案，再展開作品。':'剪斷了！較細塊紙掉落，留下的部分會組成作品。';
     const g=document.createElementNS('http://www.w3.org/2000/svg','g');
     g.setAttribute('transform',`rotate(${-params().w/2} ${C} ${C})`);g.setAttribute('pointer-events','none');
     g.innerHTML=`<path class="paper-drop" d="${polyD(result.removed)}" fill="var(--red)" stroke="var(--red-deep)" stroke-width="2"/>`;

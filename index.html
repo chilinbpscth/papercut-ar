@@ -185,6 +185,21 @@ button:active:not(:disabled){filter:brightness(.92);}
 #lesson-panel .culture-note strong{color:var(--gold);font-size:12px;}
 #lesson-panel .culture-note a{font-size:12px;}
 #lesson-panel .step-progress{color:var(--gold);font-size:12px;font-weight:600;}
+
+.rotation-panel{display:flex;align-items:center;gap:12px;padding:10px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;font-size:12px;}
+.rotation-sphere{width:84px;height:84px;flex-shrink:0;perspective:240px;border-radius:50%;background:radial-gradient(circle at 30% 25%,#e9d6b4,#786242);box-shadow:inset -8px -8px 14px #0004;touch-action:none;cursor:grab;display:grid;place-items:center;}
+.rotation-sphere:focus-visible{outline:3px solid var(--gold);outline-offset:3px;}
+.rotation-sphere:active{cursor:grabbing;}
+.rotation-globe{width:68px;height:68px;transform-style:preserve-3d;position:relative;pointer-events:none;}
+.rotation-globe i{position:absolute;inset:0;border:1px solid #fff9;border-radius:50%;}.rotation-globe i:nth-child(2){transform:rotateY(60deg);}.rotation-globe i:nth-child(3){transform:rotateX(60deg);}
+.rotation-globe b{position:absolute;inset:15px;background:var(--red);color:white;display:grid;place-items:center;font-size:18px;border:1px solid #fff8;}
+.rotation-options{flex:1;min-width:0;}.rotation-options p{margin:2px 0 5px;color:var(--muted);}.rotation-presets{display:flex;gap:5px;flex-wrap:wrap;}.rotation-presets button{font:inherit;padding:5px 8px;background:var(--ground);color:var(--ink);border:1px solid var(--line);border-radius:6px;cursor:pointer;}
+.rotation-options label{white-space:nowrap;display:flex;align-items:center;gap:6px;margin-top:6px;}.rotation-options input{flex:1;width:0;min-width:50px;accent-color:var(--red);}.rotation-options output{min-width:30px;}.rotation-values{color:var(--muted);}
+#arlive-rotation{position:absolute;left:12px;bottom:calc(78px + env(safe-area-inset-bottom));width:min(320px,calc(100% - 24px));pointer-events:auto;}
+#viewer-rotation{margin-top:8px;}#ar-body{min-height:120px;}.ar-sheet{height:min(94dvh,820px);}
+#lesson-panel.needs-answer{border:2px solid var(--gold);box-shadow:0 0 0 3px #a57b2e18;}
+.answer-prompt{display:block;margin:6px 0;padding:8px 10px;border-radius:8px;background:var(--ground);color:var(--ink);font-weight:600;}
+@media(max-height:650px){.rotation-sphere{width:62px;height:62px;}.rotation-globe{width:52px;height:52px;}.rotation-panel{padding:6px;}.rotation-options p,.rotation-values{display:none;}}
 </style>
 <div id="app">
 
@@ -252,6 +267,7 @@ button:active:not(:disabled){filter:brightness(.92);}
       <button id="arlive-start">開始</button>
     </div>
     <div id="arlive-hud" hidden>
+      <div id="arlive-rotation"></div>
       <p id="arlive-status"></p>
       <div class="bar">
         <button id="arlive-photo-btn" class="primary" hidden>📷 影相</button>
@@ -279,6 +295,7 @@ button:active:not(:disabled){filter:brightness(.92);}
         <button id="ar-close" title="關閉">✕</button>
       </div>
       <div id="ar-body"></div>
+      <div id="viewer-rotation"></div>
       <p class="ar-hint" id="ar-hint"></p>
       <button class="tool primary" id="ar-enter" disabled>喺現實擺放</button>
     </div>
@@ -527,5 +544,6 @@ function modelPt(e){
 </script>
 <script src="lessons.js"></script>
 <script src="scissors.js"></script>
+<script src="rotation-controls.js"></script>
 <script src="ar.js"></script>
 <script src="ar-live.js"></script>
