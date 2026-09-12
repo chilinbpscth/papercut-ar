@@ -39,3 +39,6 @@
 
 預定發布：https://chilinbpscth.github.io/papercut-ar/ ，使用既有 gh-pages 來源。
 仍待：手機／iPad 觸控、AR 追蹤／拍照實測；牆面擺放尚未加入。
+
+部署結果：PR #1 已合併，應用來源 e45eaa585cecf8f5c4b65d947fb54b5b3f72a8c1；gh-pages 發布 f2b842e4c654c3b872646c85fdf106fe365d8b8e，GitHub Pages 回報 built。公開 URL 實際開啟，四課選單與柳葉課最新學生文字、文化知識、即時預覽均可見。主要應用及 AR 檔已與本機建置比對。
+後續開發以本 repo main 為主，outputs/papercut-replica 是先前本機交付副本。
