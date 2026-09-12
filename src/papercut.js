@@ -5,7 +5,7 @@ let PAPER = "#c41e3a"
 const TABLE = "#fff4e8" // light window through cuts (dark/vermilion paper)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260912-cut-feedback"
+const APP_VERSION = "v20260912-studio"
 /** Hole-through fill under cuts: light paper needs dark desk so holes read. */
 function holeFill() {
   const hex = String(PAPER || "#c41e3a").replace("#", "").trim()
@@ -48,23 +48,23 @@ export function createPapercutApp(root) {
     <div class="app" data-app="papercut">
       <header class="app-header">
         <div>
-          <h1>剪紙 · 對稱創作</h1>
-          <p>摺邊留紙橋再剪窿；展開係幾何對稱——唔係 AI 評分</p>
+          <a class="brand" href="./" aria-label="剪紙工房首頁"><span class="brand-seal">剪</span><span>剪紙工房<small>PAPER · SYMMETRY · PLAY</small></span></a>
         </div>
-        <span class="ver-chip" title="硬 refresh 後應見到呢個版號">${APP_VERSION}</span>
+        <span class="studio-note" title="${APP_VERSION}">一張紙，無限可能。</span>
       </header>
       <details class="tip-card" open>
-        <summary>課堂 5 分鐘點用</summary>
+        <summary>第一次玩？睇吓點剪</summary>
         <ol>
           <li>選圓形或方形</li>
           <li>摺 2～3 次（夠對稱又唔難）</li>
           <li>畫一個圈，接返起點就會剪走；亦可以分幾刀連成一圈</li>
           <li>左下角睇小「展開」，再撳「預覽成品」</li>
-          <li>展開睇落會密好多、同單格唔一樣——呢個就係摺紙對稱，電腦冇改你剪嘅形</li>
+          <li>一個剪口，展開就變成重複花紋。試試不同摺法！</li>
         </ol>
       </details>
       <div class="panel">
         <div class="steps" id="steps"></div>
+        <div class="section-intro"><p class="eyebrow" id="stepCaption"></p><h1 id="stepTitle"></h1><p id="stepDescription"></p></div>
         <div id="controls"></div>
         <div class="stage-row" id="stageRow">
           <div class="stage tilt-wrap" id="tiltWrap">
@@ -72,7 +72,7 @@ export function createPapercutApp(root) {
             <div class="preview-stage mini hidden" id="previewWrap">
               <div class="preview-label" id="previewLabel">展開</div>
               <canvas id="preview" width="${SIZE}" height="${SIZE}" role="img" aria-label="展開預覽"></canvas>
-              <div class="preview-caption">幾何展開 · 唔係評分</div>
+              <div class="preview-caption">每一刀，都有驚喜</div>
             </div>
           </div>
         </div>
@@ -247,7 +247,7 @@ export function createPapercutApp(root) {
     const cx = SIZE / 2, cy = SIZE / 2
     const pack = packetPoly()
 
-    ctx.fillStyle = "#efe6d8"
+    ctx.fillStyle = "#f0ebe3"
     ctx.fillRect(0, 0, SIZE, SIZE)
 
     // stacked muted layers (thickness under the fold pile)
@@ -467,7 +467,7 @@ export function createPapercutApp(root) {
   function composeFull(ctx, withShadow = true, transparent = false) {
     ctx.clearRect(0, 0, SIZE, SIZE)
     if (!transparent) {
-      ctx.fillStyle = "#efe6d8"
+      ctx.fillStyle = "#f0ebe3"
       ctx.fillRect(0, 0, SIZE, SIZE)
       if (withShadow) {
         ctx.save()
@@ -527,7 +527,7 @@ export function createPapercutApp(root) {
   function drawFoldGuide(ctx) {
     const cx = SIZE / 2, cy = SIZE / 2
     const n = state.sectors
-    ctx.fillStyle = "#efe6d8"
+    ctx.fillStyle = "#f0ebe3"
     ctx.fillRect(0, 0, SIZE, SIZE)
 
     ctx.save()
@@ -666,21 +666,22 @@ export function createPapercutApp(root) {
 
   function renderSteps() {
     const labels = [["shape","1 選紙"],["fold","2 摺紙"],["cut","3 剪裁"],["result","4 展開"]]
-    stepsEl.innerHTML = labels.map(([id,t]) => `<span class="${state.step===id?"on":""}">${t}</span>`).join("")
+    const current = labels.findIndex(([id]) => id === state.step)
+    stepsEl.innerHTML = labels.map(([id,t], i) => `<span class="${i === current ? "on" : i < current ? "done" : ""}" ${i === current ? 'aria-current="step"' : ''}><b>${i < current ? "✓" : i + 1}</b>${t.slice(2)}</span>`).join("")
   }
 
   function renderControls() {
     previewWrap.classList.toggle("hidden", state.step !== "cut" || !state.showLivePreview)
     if (state.step === "shape") {
       controls.innerHTML = `<div class="row"><h2>紙形</h2>
-        <button type="button" data-shape="square" class="secondary ${state.shape==="square"?"active":""}">方形（窗花）</button>
-        <button type="button" data-shape="circle" class="secondary ${state.shape==="circle"?"active":""}">圓形（團花）</button></div>
+        <button type="button" data-shape="square" aria-pressed="${state.shape === "square"}" class="shape-card ${state.shape==="square"?"active":""}"><span class="paper-illustration square-paper"><i></i></span><span class="card-name">方形紙<span class="choice-check">✓</span></span><span class="card-detail">剪一扇窗花，留住光影。</span></button>
+        <button type="button" data-shape="circle" aria-pressed="${state.shape === "circle"}" class="shape-card ${state.shape==="circle"?"active":""}"><span class="paper-illustration circle-paper"><i></i></span><span class="card-name">圓形紙<span class="choice-check">✓</span></span><span class="card-detail">摺出團花，讓花紋綻放。</span></button></div>
         <div class="row"><h2>紙色</h2>
-        <button type="button" class="ghost tone" data-tone="#c41e3a" style="background:#c41e3a;color:#fff">硃紅</button>
-        <button type="button" class="ghost tone" data-tone="#efe6d4" style="background:#efe6d4;color:#2c2420">宣紙</button>
-        <button type="button" class="ghost tone" data-tone="#f3e4c8" style="background:#f3e4c8;color:#2c2420">米黄</button>
-        <button type="button" class="ghost tone" data-tone="#f3d9de" style="background:#f3d9de;color:#2c2420">淡粉</button>
-        <button type="button" class="ghost tone" data-tone="#dceee6" style="background:#dceee6;color:#2c2420">淡青</button></div>`
+        <button type="button" class="ghost tone" data-tone="#c41e3a" title="硃紅" style="background:#c41e3a;color:#fff">硃紅</button>
+        <button type="button" class="ghost tone" data-tone="#efe6d4" title="宣紙" style="background:#efe6d4;color:#2c2420">宣紙</button>
+        <button type="button" class="ghost tone" data-tone="#f3e4c8" title="米黃" style="background:#f3e4c8;color:#2c2420">米黄</button>
+        <button type="button" class="ghost tone" data-tone="#f3d9de" title="淡粉" style="background:#f3d9de;color:#2c2420">淡粉</button>
+        <button type="button" class="ghost tone" data-tone="#dceee6" title="淡青" style="background:#dceee6;color:#2c2420">淡青</button></div>`
       controls.querySelectorAll("[data-shape]").forEach((b) => {
         b.onclick = () => { state.shape = b.dataset.shape; state.folds = Math.min(state.folds, state.shape === "square" ? 3 : 4); state.sectors = sectorsFromFolds(state.folds); render() }
       })
@@ -696,15 +697,15 @@ export function createPapercutApp(root) {
       let opts = ""
       for (let f = 1; f <= maxFolds; f++) {
         const sec = sectorsFromFolds(f)
-        opts += `<button type="button" class="secondary ${state.folds===f?"active":""}" data-f="${f}">摺 ${f} 次（${sec} 等份）</button>`
+        opts += `<button type="button" aria-pressed="${state.folds === f}" class="secondary fold-card ${state.folds===f?"active":""}" data-f="${f}"><span class="fold-number">${f}<small>摺</small></span><span>${sec} 層紙<span class="fold-detail">${f === 1 ? "簡單開始" : f === 2 ? "初次玩推薦" : f === 3 ? "豐富對稱" : "細緻團花"}</span></span><span class="choice-check">✓</span></button>`
       }
       controls.innerHTML = `<div class="row"><h2>摺幾多次</h2>${opts}</div>`
       controls.querySelectorAll("[data-f]").forEach((b) => {
         b.onclick = () => { state.folds = Number(b.dataset.f); state.sectors = sectorsFromFolds(state.folds); render() }
       })
       hint.textContent = state.shape === "square"
-        ? "方形：深色塊＝摺完最上面嗰包（1次對半、2次一角、3次對角三角）。淺色＝摺埋睇唔到。"
-        : "圓形：深色扇形＝摺起要剪嗰格；淺色＝摺埋。建議先試摺 2～3 次。"
+        ? "深色係摺起後要剪嗰部分；虛線係摺邊。"
+        : "深色扇形係要剪嗰部分。第一次玩，試試摺 2 次。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">下一步：開始剪</button>`
       actions.querySelector("#back").onclick = () => { state.step = "shape"; render() }
@@ -753,13 +754,14 @@ export function createPapercutApp(root) {
       actions.querySelector("#next").onclick = () => {
         if (state.cutEdges.length) { flashSealHint(); return }
         state.step = "result"
-        state.unfoldT = 0
+        state.unfoldT = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0
         render()
         const t0 = performance.now()
         const dur = 900
         const anim = (now) => {
           if (state.step !== "result") return
-          state.unfoldT = Math.min(1, (now - t0) / dur)
+          const t = Math.min(1, (now - t0) / dur)
+          state.unfoldT = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 1 - (1 - t) ** 3
           drawView()
           if (state.unfoldT < 1) requestAnimationFrame(anim)
           else { state.unfoldT = 1; drawView() }
@@ -833,7 +835,7 @@ export function createPapercutApp(root) {
 
   function drawView() {
     if (state.step === "shape") {
-      vctx.fillStyle = "#efe6d8"
+      vctx.fillStyle = "#f0ebe3"
       vctx.fillRect(0, 0, SIZE, SIZE)
       vctx.fillStyle = PAPER
       vctx.strokeStyle = VERMILION
@@ -910,12 +912,12 @@ export function createPapercutApp(root) {
       }
       if (state.showLivePreview) {
         const lab = root.querySelector("#previewLabel")
-        if (lab) lab.textContent = `展開 · ${state.sectors} 等份`
+        if (lab) lab.textContent = `展開 · ${state.sectors} 份`
         const u = state.unfoldT; state.unfoldT = 1; composeFull(pctx); state.unfoldT = u
       }
     } else {
       vctx.save()
-      vctx.fillStyle = "#efe6d8"
+      vctx.fillStyle = "#f0ebe3"
       vctx.fillRect(0, 0, SIZE, SIZE)
       vctx.translate(SIZE/2, SIZE/2)
       vctx.rotate(resultAngle)
@@ -1328,9 +1330,36 @@ export function createPapercutApp(root) {
   view.addEventListener("pointercancel", onUp)
 
 
+  let previousScreen = null
+  let previousFolds = null
   function render() {
+    const app = root.querySelector(".app")
+    app.dataset.step = state.step
+    app.style.setProperty("--paper-tone", state.paperTone)
+    const copy = {
+      shape: ["01 / 選一張紙", "靈感，從一張紙開始。", "選個喜歡的形狀與顏色，做一幅屬於你的窗花。"],
+      fold: ["02 / 摺出可能", "每一摺，多一點驚喜。", "摺得越多，展開後的花紋越豐富。"],
+      cut: ["03 / 自由剪裁", "慢慢剪，讓光透進來。", `${state.shape === "circle" ? "圓形紙" : "方形紙"} · 摺 ${state.folds} 次 · ${state.sectors} 層`],
+      result: ["04 / 你的作品", "看，花紋綻放了。", "每一個剪口，都是你親手留下的創意。"],
+    }[state.step]
+    if (copy) {
+      root.querySelector("#stepCaption").textContent = copy[0]
+      root.querySelector("#stepTitle").textContent = copy[1]
+      root.querySelector("#stepDescription").textContent = copy[2]
+    }
+    if (state.step === "fold" && previousFolds !== state.folds && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      view.animate([{ transform: "perspective(800px) rotateY(-16deg) scale(.96)", opacity: .55 }, { transform: "perspective(800px) rotateY(0) scale(1)", opacity: 1 }], { duration: 480, easing: "cubic-bezier(.2,.8,.2,1)" })
+    }
+    previousFolds = state.folds
+    if (previousScreen !== state.step) {
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        root.querySelector(".section-intro").animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 400, easing: "ease-out" })
+        tiltWrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450 })
+      }
+      previousScreen = state.step
+    }
     tiltWrap.style.transform = ""
-    if (tipCard) tipCard.open = state.step === "shape" || state.step === "fold"
+    if (tipCard) tipCard.open = false
     view.style.cursor = state.step === "result" ? "default" : "crosshair"
     tiltWrap.classList.toggle("is-result", state.step === "result")
     tiltWrap.classList.toggle("artwork-frame", state.step === "result")
