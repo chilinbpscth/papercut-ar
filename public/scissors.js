@@ -24,6 +24,7 @@ function lessonPanel(){
   panel.hidden=!lesson;panel.classList.remove('needs-answer');if(!lesson)return;
   const needsAnswer=lesson.phase==='predict'&&lesson.guess===undefined;
   if(needsAnswer)panel.classList.add('needs-answer');
+  const needsStart=lesson.phase==='intro'||lesson.phase==='between';
   const course=currentLesson();
   let heading='',body='',actions='';
   const button=(action,label,primary=false)=>`<button data-action="${action}" class="${primary?'primary':''}">${label}</button>`;
@@ -49,7 +50,7 @@ function lessonPanel(){
     heading=course.title+'完成';body=course.finish;
     actions=button('retry','再跟線練一次')+button('explore','去掉引導線，自己試')+button('courses','揀下一課',true);
   }
-  panel.innerHTML=`<div class="lesson-row">${lesson.phase==='predict'?'':targetFlower()}<div><div class="eyebrow">跟住學 · ${course.title}</div><div class="step-progress">已完成 ${state.cuts.length} / ${course.steps.length} 步</div><h3>${heading}</h3>${needsAnswer?'<div class="answer-box"><div class="answer-prompt" role="status"><span class="answer-hand" aria-hidden="true">👇</span><div><strong>請按下面其中一個答案</strong><span>先揀答案，先可以展開作品。</span></div><b class="answer-alert" aria-hidden="true">!</b></div>':''}<div>${body}</div><div class="lesson-actions">${actions}</div>${needsAnswer?'</div>':''}<div class="culture-note"><strong>文化小知識</strong><p>${course.culture}</p><a href="${course.source}" target="_blank" rel="noopener">來源：${course.sourceName}</a></div></div></div>`;
+  panel.innerHTML=`<div class="lesson-row">${lesson.phase==='predict'?'':targetFlower()}<div><div class="eyebrow">跟住學 · ${course.title}</div><div class="step-progress">已完成 ${state.cuts.length} / ${course.steps.length} 步</div><h3>${heading}</h3>${needsStart?`<div class="answer-box start-box"><div class="answer-prompt" role="status"><span class="answer-hand" aria-hidden="true">👇</span><div><strong>${lesson.phase==='intro'?'按下面按鈕，開始剪紙':'按「下一步」，繼續剪紙'}</strong><span>按完就會出現白色引導線。</span></div></div>`:''}${needsAnswer?'<div class="answer-box"><div class="answer-prompt" role="status"><span class="answer-hand" aria-hidden="true">👇</span><div><strong>請按下面其中一個答案</strong><span>先揀答案，先可以展開作品。</span></div><b class="answer-alert" aria-hidden="true">!</b></div>':''}<div>${body}</div><div class="lesson-actions">${actions}</div>${needsAnswer||needsStart?'</div>':''}<div class="culture-note"><strong>文化小知識</strong><p>${course.culture}</p><a href="${course.source}" target="_blank" rel="noopener">來源：${course.sourceName}</a></div></div></div>`;
 }
 function guideMarkup(){
   if(state.lesson?.phase!=='cut')return '';
