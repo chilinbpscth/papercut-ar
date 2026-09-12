@@ -31,13 +31,14 @@ Vite base 是 `/papercut-ar/`。`dist/` 為 GitHub Pages 靜態成品，發布�
 - `public/cut-geometry.js`：刀線分割多邊形。
 - `public/scissors.js`：手勢、教學進度、即時預覽。
 - `public/lessons.js`：課程、目標圖及文化來源。
+- `public/rotation-controls.js`：AR 角度球、旋轉及擺放快捷鍵。
 - `public/ar.js`、`public/ar-live.js`、`public/vendor/`：3D 模型輸出與 AR。
 - `src/` 及舊 `.test.js`：先前版本的實作與回歸測試，保留作歷史參考；目前入口不載入。
 
 ## 驗證與限制
 
-新版本 14 項幾何／互動測試通過；桌面已實剪第四課全部三步並展開，3D 花形生成亦已驗證。
-支援不交叉刀線，保留较大紙塊。手機觸控、AR 追蹤及拍照仍待實機驗證；主要 AR 路徑水平擺放，未加入牆面適配。
+新版本 19 項幾何／互動／旋轉控制測試通過；桌面已實剪第四課全部三步並展開，3D 花形生成亦已驗證。
+支援不交叉刀線，保留较大紙塊。手機觸控、AR 追蹤及拍照仍待實機驗證；AR 提供角度球、360° 自轉及「貼牆 90°」快捷鍵，需手動對齊牆面，尚未自動辨識牆面法線。
 文化課是傳統元素的數碼練習，不代表完整掌握特定非遺流派技法。
 
 基礎前端與 AR 資源來自 https://papercut-poc.pages.dev/ （2026-09-12）；保留原始授權聲明。`source-manifest.json` 記錄原站下載基準。原站的一個可選 worker 引用回傳 HTML，未作 worker 複製，詳見 manifest。沒有承諾所有引擎可選路徑可離線使用。
