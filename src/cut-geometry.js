@@ -12,10 +12,9 @@ export function raySegHit(cx, cy, angle, p1, p2) {
   return null
 }
 
-
 export function polygonArea(pts) {
-return Math.abs(pts.reduce((sum, p, i) => {
-  const q = pts[(i + 1) % pts.length]
-  return sum + p.x * q.y - q.x * p.y
-}, 0)) / 2
+  return Math.abs(pts.reduce((sum, p, i) => {
+    const q = pts[(i + 1) % pts.length]
+    return sum + p.x * q.y - q.x * p.y
+  }, 0)) / 2
 }
