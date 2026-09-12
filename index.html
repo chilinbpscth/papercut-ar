@@ -1,13 +1,531 @@
-<!doctype html>
-<html lang="zh-Hant-HK">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>剪紙 · 視藝</title>
-    <script type="module" crossorigin src="/papercut-ar/assets/index-CnvyKxgo.js"></script>
-    <link rel="stylesheet" crossorigin href="/papercut-ar/assets/index-Czq8HadZ.css">
-  </head>
-  <body>
-    <div id="app"></div>
-  </body>
-</html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>剪紙</title>
+<style>
+:root{
+  --ground:#EFEAE1;
+  --surface:#FBF8F2;
+  --ink:#33302A;
+  --muted:#877F71;
+  --line:#DCD4C4;
+  --red:#BC3532;
+  --red-deep:#8E2528;
+  --gold:#A57B2E;
+  --shadow:0 10px 30px rgba(60,40,20,.14);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#211E1A;
+    --surface:#2B2722;
+    --ink:#EDE6D8;
+    --muted:#9C9284;
+    --line:#403A31;
+    --red:#C94943;
+    --red-deep:#8E2528;
+    --gold:#C09A4A;
+    --shadow:0 10px 30px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#211E1A;
+  --surface:#2B2722;
+  --ink:#EDE6D8;
+  --muted:#9C9284;
+  --line:#403A31;
+  --red:#C94943;
+  --red-deep:#8E2528;
+  --gold:#C09A4A;
+  --shadow:0 10px 30px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  background:var(--ground);
+  color:var(--ink);
+  font-family:-apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;
+  overflow:hidden;
+  -webkit-user-select:none;user-select:none;
+  -webkit-touch-callout:none;
+  overscroll-behavior:none;
+}
+#app{height:100dvh;display:flex;flex-direction:column;}
+.screen{display:none;flex:1;min-height:0;flex-direction:column;
+  padding:calc(20px + env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom));}
+.screen.active{display:flex;}
+
+.brand{display:flex;align-items:center;gap:12px;justify-content:center;margin:18px 0 6px;}
+.seal{width:44px;height:44px;background:var(--red);color:#FBF6EC;border-radius:6px;
+  display:grid;place-items:center;font-family:"Songti TC","Noto Serif TC",serif;
+  font-size:26px;font-weight:700;box-shadow:var(--shadow);}
+h1{font-family:"Songti TC","Noto Serif TC",serif;font-weight:700;font-size:34px;letter-spacing:.12em;}
+.step-label{color:var(--gold);font-size:13px;letter-spacing:.3em;text-align:center;margin:26px 0 4px;}
+h2{font-family:"Songti TC","Noto Serif TC",serif;font-size:24px;text-align:center;font-weight:600;margin-bottom:24px;}
+.sub{color:var(--muted);text-align:center;font-size:14px;margin-top:-16px;margin-bottom:22px;}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;
+  width:100%;max-width:560px;margin:0 auto;}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:20px 14px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;
+  cursor:pointer;font:inherit;color:inherit;box-shadow:var(--shadow);
+  transition:transform .12s ease;}
+.card:active{transform:scale(.96);}
+.card svg{width:96px;height:96px;display:block;}
+.card .name{font-size:17px;font-weight:600;}
+.card .desc{font-size:13px;color:var(--muted);}
+
+.topbar{display:flex;align-items:center;gap:12px;min-height:44px;}
+.btn-back{background:none;border:none;color:var(--ink);font:inherit;font-size:15px;
+  padding:10px 12px 10px 0;cursor:pointer;display:flex;align-items:center;gap:4px;}
+.topbar .where{font-size:15px;font-weight:600;}
+.topbar .layers{font-size:13px;color:var(--muted);margin-left:auto;}
+
+.stage{flex:1;min-height:0;position:relative;display:grid;place-items:center;padding:8px 0;}
+.stage svg.main{width:100%;height:100%;touch-action:none;display:block;}
+#thumbwrap{position:absolute;top:6px;right:2px;width:92px;text-align:center;cursor:pointer;}
+#thumbwrap .box{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+  padding:6px;box-shadow:var(--shadow);}
+#thumbwrap svg{width:100%;display:block;}
+#thumbwrap .cap{font-size:11px;color:var(--muted);margin-top:4px;letter-spacing:.15em;}
+
+.hint{text-align:center;font-size:13px;color:var(--muted);margin:2px 0 10px;}
+.toolbar{display:flex;gap:10px;align-items:center;}
+.toolbar .grow{flex:1;}
+button.tool{background:var(--surface);border:1px solid var(--line);color:var(--ink);
+  border-radius:10px;font:inherit;font-size:15px;padding:12px 18px;cursor:pointer;min-height:48px;}
+button.tool:disabled{opacity:.35;}
+button.primary{background:var(--red);border-color:var(--red);color:#FBF6EC;font-weight:600;
+  padding:12px 22px;}
+button:active:not(:disabled){filter:brightness(.92);}
+@media (max-height:600px){
+  .brand{margin:6px 0 2px;} h1{font-size:26px;} .step-label{margin-top:10px;}
+}
+
+#ar-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;
+  display:flex;align-items:flex-end;justify-content:center;}
+#ar-modal[hidden]{display:none;}
+.ar-sheet{background:var(--ground);border-radius:18px 18px 0 0;width:100%;max-width:640px;
+  height:min(78dvh,640px);display:flex;flex-direction:column;box-shadow:var(--shadow);
+  padding:14px 16px calc(16px + env(safe-area-inset-bottom));}
+.ar-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.ar-top .t{font-weight:600;font-size:17px;}
+#ar-close{background:var(--surface);border:1px solid var(--line);color:var(--ink);
+  border-radius:50%;width:36px;height:36px;font:inherit;font-size:16px;cursor:pointer;}
+#ar-body{flex:1;min-height:0;border-radius:12px;overflow:hidden;background:var(--surface);
+  border:1px solid var(--line);}
+#ar-body model-viewer{width:100%;height:100%;background:var(--surface);}
+.ar-hint{font-size:13px;color:var(--muted);text-align:center;margin:10px 0;}
+#ar-enter{width:100%;}
+
+/* ---------- in-page AR（8th Wall） ----------
+   注意：XRExtras FullWindowCanvas 會將 #arlive-canvas 搬去 body 直屬，
+   所以 canvas 要自己有 fixed + z-index；#arlive 只係 UI 層，
+   pointer-events:none 令 taps 穿透落 canvas（擺紙用）。 */
+#arlive{position:fixed;inset:0;z-index:60;pointer-events:none;}
+#arlive[hidden]{display:none;}
+#arlive-canvas{position:fixed;inset:0;width:100%;height:100%;z-index:55;display:none;}
+#arlive-intro{position:absolute;inset:0;z-index:3;pointer-events:auto;background:rgba(20,16,12,.92);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:20px;text-align:center;padding:28px;color:#F5EFE3;}
+#arlive-intro[hidden]{display:none;}
+#arlive-intro-text{font-size:17px;line-height:1.7;max-width:420px;}
+#arlive-start{font:inherit;font-size:18px;font-weight:600;background:var(--red);
+  color:#FBF6EC;border:none;border-radius:12px;padding:14px 40px;cursor:pointer;}
+#arlive-start:disabled{opacity:.4;}
+#arlive-hud{position:absolute;inset:0;z-index:2;pointer-events:none;}
+#arlive-hud[hidden]{display:none;}
+#arlive-status{position:absolute;top:calc(14px + env(safe-area-inset-top));left:16px;right:16px;
+  color:#fff;font-size:16px;font-weight:600;text-align:center;
+  text-shadow:0 1px 4px rgba(0,0,0,.8);}
+#arlive-hud .bar{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom));left:0;right:0;
+  display:flex;justify-content:center;gap:14px;pointer-events:auto;}
+#arlive-hud .bar button{font:inherit;font-size:15px;font-weight:600;border:none;
+  border-radius:24px;padding:12px 24px;cursor:pointer;color:#fff;
+  background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);}
+#arlive-hud .bar button.primary{background:var(--red);}
+#arlive-flash{position:absolute;inset:0;z-index:4;background:#fff;opacity:0;
+  pointer-events:none;transition:opacity .25s;}
+#arlive-photo{position:absolute;inset:0;z-index:5;background:#000;pointer-events:auto;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px;}
+#arlive-photo[hidden]{display:none;}
+#arlive-photo img{max-width:100%;max-height:72%;border-radius:12px;}
+#arlive-photo .row{display:flex;gap:12px;}
+#arlive-photo a,#arlive-photo button{font:inherit;font-size:16px;font-weight:600;border:none;
+  border-radius:12px;padding:12px 28px;cursor:pointer;text-decoration:none;}
+#arlive-photo-save{background:var(--red);color:#FBF6EC;}
+#arlive-photo-close{background:rgba(255,255,255,.16);color:#fff;}
+#arlive-attribution{position:absolute;bottom:2px;right:6px;z-index:2;font-size:9px;
+  color:rgba(255,255,255,.6);text-shadow:0 1px 2px rgba(0,0,0,.7);}
+#arlive-attribution a{color:inherit;}
+
+.lesson-flower{font-size:68px;line-height:1.3;color:var(--red);}
+.home-note{font-size:14px;color:var(--muted);text-align:center;margin:26px auto;max-width:420px;line-height:1.8;}
+#lesson-panel{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:12px 16px;margin:4px 0 8px;font-size:14px;line-height:1.6;}
+#lesson-panel[hidden]{display:none;}
+#lesson-panel .lesson-row{display:flex;align-items:center;gap:14px;}
+#lesson-panel .target{width:74px;min-width:74px;height:74px;}
+#lesson-panel h3{font-size:16px;margin-bottom:3px;}
+#lesson-panel .eyebrow{font-size:11px;color:var(--gold);letter-spacing:.12em;}
+#lesson-panel .lesson-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;}
+#lesson-panel button{font:inherit;color:var(--ink);background:var(--ground);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;}
+#lesson-panel button.primary{color:#FBF6EC;background:var(--red);border-color:var(--red);}
+#lesson-panel .prediction{color:var(--red);font-weight:600;margin-top:5px;}
+#cutsvg{cursor:crosshair;}
+#cutsvg .paper-drop{animation:paperDrop .65s ease-in forwards;transform-box:fill-box;transform-origin:center;}
+@keyframes paperDrop{to{transform:translate(20px,100px) rotate(12deg);opacity:0;}}
+#cutsvg.reveal{animation:paperReveal .6s ease-out;transform-origin:center;}
+@keyframes paperReveal{from{opacity:.25;transform:scale(.8);}to{opacity:1;transform:scale(1);}}
+@media(prefers-reduced-motion:reduce){#cutsvg .paper-drop,#cutsvg.reveal{animation:none;}.paper-drop{display:none;}}
+@media(max-width:480px){.screen{padding-left:12px;padding-right:12px;}#lesson-panel{font-size:13px;padding:10px;}#lesson-panel .target{width:50px;min-width:50px;height:50px;}.toolbar{gap:6px;}button.tool{font-size:13px;padding:10px;}.hint{font-size:12px;}#thumbwrap{width:76px;}#thumbwrap .cap{font-size:10px;letter-spacing:0;}}
+@media(max-height:650px){#lesson-panel .target{display:none;}#lesson-panel{max-height:145px;overflow:auto;}.home-note{margin:12px auto;}h2{margin-bottom:12px;}}
+
+#s-lessons{overflow:auto;}#lesson-cards{grid-template-columns:repeat(2,minmax(0,1fr));max-width:680px;}
+#lesson-cards .card{gap:6px;padding:14px;}#lesson-cards .card svg{width:76px;height:76px;}
+#s-lessons a,#lesson-panel a{color:var(--gold);text-underline-offset:3px;}
+#lesson-panel .culture-note{font-size:13px;color:var(--ink);margin-top:10px;padding-top:8px;border-top:1px solid var(--line);}
+#lesson-panel .culture-note strong{color:var(--gold);font-size:12px;}
+#lesson-panel .culture-note a{font-size:12px;}
+#lesson-panel .step-progress{color:var(--gold);font-size:12px;font-weight:600;}
+</style>
+<div id="app">
+
+  <section class="screen active" id="s-home">
+    <div class="brand"><div class="seal">剪</div><h1>剪紙</h1></div>
+    <div class="step-label">摺一摺・剪一剪・發現對稱</div>
+    <h2>由一條弧線，剪出一朵花</h2>
+    <div class="cards">
+      <button class="card" id="start-lesson"><span class="lesson-flower" aria-hidden="true">✿</span><span class="name">跟住學</span><span class="desc">四課：由花瓣到傳統紋樣</span></button>
+      <button class="card" id="start-free"><span class="lesson-flower" aria-hidden="true">✂</span><span class="name">自由創作</span><span class="desc">從紙邊出發，試出自己的圖案</span></button>
+    </div>
+    <p class="home-note">剪一條線，唔一定會甩。剪斷咗，紙碎先會掉落。</p>
+  </section>
+  <section class="screen" id="s-lessons">
+    <button class="btn-back" id="lessons-back">‹ 返回</button>
+    <div class="step-label">跟住學 · 傳統剪紙元素</div>
+    <h2>一課一個新剪法</h2>
+    <div class="cards" id="lesson-cards"></div>
+    <p class="home-note">以傳統元素設計的數碼折剪練習。中國剪紙於 2009 年列入人類非物質文化遺產代表作名錄。<br><a href="https://ich.unesco.org/en/RL/chinese-paper-cut-00219" target="_blank" rel="noopener">認識中國剪紙 · UNESCO</a></p>
+  </section>
+  <section class="screen" id="s-shape">
+    <button class="btn-back" id="back-home">‹ 返回</button>
+    <div class="brand"><div class="seal">剪</div><h1>剪紙</h1></div>
+    <div class="step-label">第一步</div>
+    <h2>選擇紙形</h2>
+    <div class="cards" id="shape-cards"></div>
+  </section>
+
+  <section class="screen" id="s-folds">
+    <div class="topbar"><button class="btn-back" id="back-shape">‹ 紙形</button></div>
+    <div class="step-label">第二步</div>
+    <h2>摺疊幾多次？</h2>
+    <p class="sub">摺得越多，圖案重複越多、越似團花</p>
+    <div class="cards" id="fold-cards"></div>
+  </section>
+
+  <section class="screen" id="s-cut">
+    <div class="topbar">
+      <button class="btn-back" id="back-folds">‹ 摺法</button>
+      <span class="where" id="cut-title"></span>
+      <span class="layers" id="cut-layers"></span>
+    </div>
+    <div id="lesson-panel" hidden aria-live="polite"></div>
+    <div class="stage">
+      <svg class="main" id="cutsvg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="thumbwrap" title="切換預覽">
+        <div class="box"><svg id="thumbsvg" viewBox="0 0 1000 1000"></svg></div>
+        <div class="cap">即時預覽<br>金框：手上這份</div>
+      </div>
+    </div>
+    <p class="hint" id="hint" role="status" aria-live="polite"></p>
+    <div class="toolbar">
+      <button class="tool" id="btn-undo">復原</button>
+      <button class="tool" id="btn-clear">全部重來</button>
+      <span class="grow"></span>
+      <button class="tool" id="btn-ar" hidden>AR 擺放</button>
+      <button class="tool primary" id="btn-mode">預覽成品</button>
+    </div>
+  </section>
+
+  <div id="arlive" hidden>
+    <canvas id="arlive-canvas"></canvas>
+    <div id="arlive-intro" hidden>
+      <p id="arlive-intro-text"></p>
+      <button id="arlive-start">開始</button>
+    </div>
+    <div id="arlive-hud" hidden>
+      <p id="arlive-status"></p>
+      <div class="bar">
+        <button id="arlive-photo-btn" class="primary" hidden>📷 影相</button>
+      </div>
+    </div>
+    <div id="arlive-flash"></div>
+    <div id="arlive-photo" hidden>
+      <img id="arlive-photo-img" alt="剪紙 AR 相片">
+      <div class="row">
+        <button id="arlive-photo-save">儲存相片</button>
+        <button id="arlive-photo-close">返去 AR</button>
+      </div>
+      <p style="font-size:12px;color:rgba(255,255,255,.65);margin:0;">又或者長按上面張相，揀「加入相片」</p>
+    </div>
+    <button id="arlive-close" style="position:absolute;top:calc(12px + env(safe-area-inset-top));right:14px;z-index:6;
+      width:38px;height:38px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;
+      font:inherit;font-size:16px;cursor:pointer;pointer-events:auto;">✕</button>
+    <p id="arlive-attribution">AR: <a href="vendor/8thwall/1.0.0/LICENSE-AGREEMENT">Niantic Spatial XR Engine</a> © 2026 Niantic Spatial, Inc.（as-is，無擔保）</p>
+  </div>
+
+  <div id="ar-modal" hidden>
+    <div class="ar-sheet">
+      <div class="ar-top">
+        <span class="t">AR 擺放</span>
+        <button id="ar-close" title="關閉">✕</button>
+      </div>
+      <div id="ar-body"></div>
+      <p class="ar-hint" id="ar-hint"></p>
+      <button class="tool primary" id="ar-enter" disabled>喺現實擺放</button>
+    </div>
+  </div>
+
+</div>
+<script src="cut-geometry.js"></script>
+<script>
+'use strict';
+const C = 500, R = 430, H = 430;
+const state = { shape: null, folds: 0, cuts: [], mode: 'cut' };
+const $ = s => document.querySelector(s);
+const f = n => Math.round(n * 10) / 10;
+
+/* ---------- 幾何 ---------- */
+function params(){
+  const N = 2 ** state.folds, w = 360 / N, a0 = -90;
+  return { N, w, a0, a1: a0 + w };
+}
+function ptAt(aDeg, d){
+  const a = aDeg * Math.PI / 180;
+  return { x: C + d * Math.cos(a), y: C + d * Math.sin(a) };
+}
+function boundaryDist(shape, aDeg){
+  if (shape === 'circle') return R;
+  const a = aDeg * Math.PI / 180;
+  return H / Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)));
+}
+function paperPathD(shape){
+  if (shape === 'square')
+    return `M ${C-H} ${C-H} H ${C+H} V ${C+H} H ${C-H} Z`;
+  return `M ${C-R} ${C} A ${R} ${R} 0 1 0 ${C+R} ${C} A ${R} ${R} 0 1 0 ${C-R} ${C} Z`;
+}
+function clipHalf(poly, aDeg, sign){
+  const a = aDeg * Math.PI / 180, dx = Math.cos(a), dy = Math.sin(a);
+  const ev = p => (dx * (p.y - C) - dy * (p.x - C)) * sign;
+  const out = [];
+  for (let i = 0; i < poly.length; i++){
+    const p1 = poly[i], p2 = poly[(i + 1) % poly.length];
+    const e1 = ev(p1), e2 = ev(p2);
+    if (e1 >= 0) out.push(p1);
+    if ((e1 >= 0) !== (e2 >= 0)){
+      const t = e1 / (e1 - e2);
+      out.push({ x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t });
+    }
+  }
+  return out;
+}
+function polyD(poly){
+  return 'M ' + poly.map(p => `${f(p.x)} ${f(p.y)}`).join(' L ') + ' Z';
+}
+function wedgePathD(){
+  const { w, a0, a1 } = params();
+  if (state.shape === 'circle'){
+    const p0 = ptAt(a0, R), p1 = ptAt(a1, R);
+    return `M ${C} ${C} L ${f(p0.x)} ${f(p0.y)} A ${R} ${R} 0 0 1 ${f(p1.x)} ${f(p1.y)} Z`;
+  }
+  let poly = [{x:C-H,y:C-H},{x:C+H,y:C-H},{x:C+H,y:C+H},{x:C-H,y:C+H}];
+  poly = clipHalf(poly, a0, 1);
+  poly = clipHalf(poly, a1, -1);
+  return polyD(poly);
+}
+function copyTransforms(){
+  const { N, w, a0 } = params(), out = [];
+  for (let k = 0; k < N; k++){
+    out.push(k % 2 === 0
+      ? `rotate(${k * w})`
+      : `rotate(${2 * a0 + (k + 1) * w}) scale(1 -1)`);
+  }
+  return out;
+}
+/* 平滑封閉剪口路徑 */
+function cutPathD(pts){ return polyD(pts); }
+function polylineD(pts){
+  return 'M ' + pts.map(p => `${f(p.x)} ${f(p.y)}`).join(' L ');
+}
+
+/* ---------- 畫面組件 ---------- */
+function cutsMarkup(){
+  return state.cuts.map(p => `<path d="${cutPathD(p)}" fill="#000"/>`).join('');
+}
+function previewMarkup(prefix){
+  const paper = paperPathD(state.shape), wedge = wedgePathD();
+  const copies = copyTransforms().map(T =>
+    `<g transform="translate(${C} ${C}) ${T} translate(${-C} ${-C})">` +
+    `<g clip-path="url(#${prefix}wc)">${cutsMarkup()}</g></g>`).join('');
+  return `<defs>
+    <clipPath id="${prefix}wc"><path d="${wedge}"/></clipPath>
+    <mask id="${prefix}m"><path d="${paper}" fill="#fff"/>${copies}</mask>
+  </defs>
+  <path d="${paper}" fill="var(--red)" mask="url(#${prefix}m)"/>`;
+}
+function outerEdgeD(){
+  const { a0, a1 } = params();
+  const angles = state.shape === 'circle'
+    ? Array.from({length: 49}, (_, i) => a0 + (a1-a0)*i/48)
+    : [a0, ...[-45, 45].filter(a => a > a0 && a < a1), a1];
+  return polylineD(angles.map(a => ptAt(a, boundaryDist(state.shape, a))));
+}
+function orientationMarkup(){
+  const { w, a0, a1 } = params();
+  const outerAngle = a0 + w / 2;
+  const outer = rotPt(ptAt(outerAngle, boundaryDist(state.shape, outerAngle)), -w / 2);
+  const fold = rotPt(ptAt(a0, boundaryDist(state.shape, a0) * .52), -w / 2);
+  const label = (x, y, text, anchor = 'middle') =>
+    `<text x="${f(x)}" y="${f(y)}" text-anchor="${anchor}" fill="var(--ink)" font-size="19" font-weight="500" stroke="var(--ground)" stroke-width="5" paint-order="stroke">${text}</text>`;
+  return `<g pointer-events="none" aria-label="紙張位置提示">
+    <circle cx="${C}" cy="${C}" r="7" fill="var(--gold)" stroke="var(--ground)" stroke-width="2"/>
+    <path d="M ${C} ${C+10} V ${C+28}" stroke="var(--gold)" stroke-width="2"/>
+    ${label(C, C+49, '紙中心')}
+    ${state.cuts.length ? '' : label(outer.x, outer.y-22, '紙外邊')}
+    ${label(fold.x-20, fold.y, '摺邊', 'end')}
+  </g>`;
+}
+function orientationThumbMarkup(){
+  const pending = state.pending || [];
+  const lines = pending.length > 1 ? copyTransforms().map(T =>
+    `<g transform="translate(${C} ${C}) ${T} translate(${-C} ${-C})"><g clip-path="url(#thwc)"><path d="${polylineD(pending)}" fill="none" stroke="var(--ink)" stroke-width="7"/></g></g>`).join('') : '';
+  return previewMarkup('th') +
+    `<path d="${wedgePathD()}" fill="var(--gold)" fill-opacity=".22" stroke="var(--gold)" stroke-width="8" mask="url(#thm)"/>${lines}
+    <circle cx="${C}" cy="${C}" r="25" fill="var(--gold)" stroke="var(--ground)" stroke-width="8"/>`;
+}
+function foldMarkup(){
+  const wedge = wedgePathD();
+  const { w, a0, a1 } = params();
+  const b0 = ptAt(a0, boundaryDist(state.shape, a0));
+  const b1 = ptAt(a1, boundaryDist(state.shape, a1));
+  const foldLine = (b) =>
+    `<line x1="${C}" y1="${C}" x2="${f(b.x)}" y2="${f(b.y)}" stroke="var(--ink)" stroke-opacity=".45" stroke-width="3" stroke-dasharray="14 12"/>`;
+  return `<defs>
+    <clipPath id="cfwc"><path d="${wedge}"/></clipPath>
+    <mask id="cfm"><path d="${wedge}" fill="#fff"/><g clip-path="url(#cfwc)">${cutsMarkup()}</g></mask>
+  </defs>
+  <g transform="rotate(${-w/2} ${C} ${C})">
+    <g transform="translate(11 13)" opacity=".16"><path d="${wedge}" fill="var(--red-deep)" mask="url(#cfm)"/></g>
+    <g transform="translate(5 6)" opacity=".3"><path d="${wedge}" fill="var(--red-deep)" mask="url(#cfm)"/></g>
+    <path d="${wedge}" fill="var(--red)" mask="url(#cfm)"/>
+    <path d="${outerEdgeD()}" fill="none" stroke="var(--ink)" stroke-opacity=".45" stroke-width="2" mask="url(#cfm)"/>
+    <g mask="url(#cfm)">${foldLine(b0)}${foldLine(b1)}</g>
+    <path id="live" d="" fill="var(--ground)" fill-opacity=".55" stroke="var(--ink)" stroke-opacity=".6" stroke-width="4" stroke-dasharray="10 10" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>${orientationMarkup()}`;
+}
+function shapeIcon(shape){
+  return `<svg viewBox="0 0 1000 1000"><path d="${paperPathD(shape)}" fill="var(--red)"/></svg>`;
+}
+function foldIcon(shape, n){
+  const N = 2 ** n, w = 360 / N;
+  let lines = '';
+  for (let k = 0; k < N; k++){
+    const a = -90 + k * w;
+    const b = ptAt(a, boundaryDist(shape, a));
+    lines += `<line x1="${C}" y1="${C}" x2="${f(b.x)}" y2="${f(b.y)}" stroke="#FBF6EC" stroke-opacity=".9" stroke-width="16" stroke-dasharray="40 30"/>`;
+  }
+  return `<svg viewBox="0 0 1000 1000"><path d="${paperPathD(shape)}" fill="var(--red)"/>${lines}</svg>`;
+}
+
+/* ---------- 畫面流程 ---------- */
+function show(id){
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+const SHAPES = [
+  { key: 'square', name: '方形紙', desc: '傳統窗花常用' },
+  { key: 'circle', name: '圓形紙', desc: '適合團花圖案' },
+];
+$('#shape-cards').innerHTML = SHAPES.map(s =>
+  `<button class="card" data-shape="${s.key}">${shapeIcon(s.key)}<span class="name">${s.name}</span><span class="desc">${s.desc}</span></button>`).join('');
+document.querySelectorAll('#shape-cards .card').forEach(el =>
+  el.addEventListener('click', () => {
+    state.shape = el.dataset.shape;
+    buildFoldCards();
+    show('#s-folds');
+  }));
+
+function buildFoldCards(){
+  const opts = state.shape === 'circle' ? [1,2,3,4] : [1,2,3];
+  $('#fold-cards').innerHTML = opts.map(n =>
+    `<button class="card" data-folds="${n}">${foldIcon(state.shape, n)}<span class="name">摺 ${n} 次</span><span class="desc">${2**n} 等份</span></button>`).join('');
+  document.querySelectorAll('#fold-cards .card').forEach(el =>
+    el.addEventListener('click', () => {
+      state.folds = +el.dataset.folds;
+      state.cuts = [];
+      state.mode = 'cut';
+      resetScissors();
+      enterCutScreen();
+      show('#s-cut');
+    }));
+}
+$('#back-shape').addEventListener('click', () => show('#s-shape'));
+$('#back-folds').addEventListener('click', () => show(state.lesson ? '#s-lessons' : '#s-folds'));
+
+/* ---------- 剪裁畫面 ---------- */
+const svg = $('#cutsvg');
+function enterCutScreen(){
+  const shapeName = state.shape === 'circle' ? '圓形紙' : '方形紙';
+  $('#cut-title').textContent = `${shapeName}・摺 ${state.folds} 次`;
+  $('#cut-layers').textContent = `${2**state.folds} 層`;
+  render();
+}
+function wedgeDisplayViewBox(){
+  const { w, a0, a1 } = params();
+  let pts = [{ x: C, y: C }];
+  if (state.shape === 'circle'){
+    for (let i = 0; i <= 24; i++) pts.push(ptAt(a0 + (a1 - a0) * i / 24, R));
+  } else {
+    let poly = [{x:C-H,y:C-H},{x:C+H,y:C-H},{x:C+H,y:C+H},{x:C-H,y:C+H}];
+    poly = clipHalf(poly, a0, 1);
+    poly = clipHalf(poly, a1, -1);
+    pts = pts.concat(poly);
+  }
+  pts = pts.map(p => rotPt(p, -w / 2));   /* 同顯示層旋轉一致 */
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const x0 = Math.min(...xs) - 90, y0 = Math.min(...ys) - 65;
+  const bw = Math.max(...xs) - Math.min(...xs) + 180, bh = Math.max(...ys) - Math.min(...ys) + 140;
+  return `${f(x0)} ${f(y0)} ${f(bw)} ${f(bh)}`;
+}
+function render(){
+  if (state.mode === 'cut'){
+    svg.setAttribute('viewBox', wedgeDisplayViewBox());
+    svg.innerHTML = foldMarkup();
+    $('#thumbsvg').innerHTML = orientationThumbMarkup();
+    $('#thumbwrap').style.display = '';
+    $('#btn-mode').textContent = '預覽成品';
+    $('#hint').textContent = '由紙邊入剪，剪到另一條邊，較細塊紙先會掉落。';
+  } else {
+    svg.setAttribute('viewBox', '0 0 1000 1000');
+    svg.innerHTML = previewMarkup('pv');
+    $('#thumbwrap').style.display = 'none';
+    $('#btn-mode').textContent = '繼續剪裁';
+    $('#hint').textContent = '展開後的成品。可隨時返回繼續剪裁。';
+  }
+  $('#btn-undo').disabled = state.cuts.length === 0;
+  $('#btn-clear').disabled = state.cuts.length === 0;
+  $('#btn-ar').hidden = state.mode !== 'preview';
+}
+function rotPt(p, deg){
+  const r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
+  const dx = p.x - C, dy = p.y - C;
+  return { x: C + dx * c - dy * s, y: C + dx * s + dy * c };
+}
+function modelPt(e){
+  const m = svg.getScreenCTM().inverse();
+  const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m);
+  return rotPt(pt, params().w / 2);   /* 抵消顯示層 rotate(-w/2) */
+}
+</script>
+<script src="lessons.js"></script>
+<script src="scissors.js"></script>
+<script src="ar.js"></script>
+<script src="ar-live.js"></script>
