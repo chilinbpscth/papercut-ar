@@ -1,0 +1,116 @@
+{
+  "source": "https://papercut-poc.pages.dev/",
+  "files": [
+    {
+      "path": "vendor/8thwall/1.0.0/xr-slam.js",
+      "bytes": 5538007,
+      "sha256": "398f675c920892afd4521d5196df2b6b8a1b8a90b6a5c749cf5ad1a6e0a85270"
+    },
+    {
+      "path": "vendor/8thwall/1.0.0/resources/media-worker.js",
+      "bytes": 4995543,
+      "sha256": "db47c89ca2ec7d9eba75e114c195896c74c7b0ff888ce2970dfd9bd8bdfeda8d"
+    },
+    {
+      "path": "vendor/8thwall/1.0.0/resources/semantics-worker.js",
+      "bytes": 4998145,
+      "sha256": "7db219a04051354c20d0fbe16333236ba0b49054fbe985a334b49817032da45e"
+    },
+    {
+      "path": "index.html",
+      "bytes": 21421,
+      "sha256": "759df746ab5706bd8e83434c5bc8bfcdbbf66683d451a0cd41fdd14e6fed4681"
+    },
+    {
+      "path": "ar.js",
+      "bytes": 12887,
+      "sha256": "1cd887694164d6641a814bb17ed90136d77e81c574132410d6f8aa4963aa9363"
+    },
+    {
+      "path": "ar-live.js",
+      "bytes": 11544,
+      "sha256": "6a4f6f9a6efa72bb3f910494be85c2c0a38fc5faa2ddd9315c2a8e21ef08d950"
+    },
+    {
+      "path": "vendor/model-viewer.min.js",
+      "bytes": 979139,
+      "sha256": "8367184a607fbe07a78b650c0d359e5ebbd96f7e2b22f95f761f559b63430386"
+    },
+    {
+      "path": "vendor/three/three-0.149.0.min.js",
+      "bytes": 608081,
+      "sha256": "8a5f7249903b54d30f79f708699d2fed2d6a1d0741a4cd41377d1f01bb5a2271"
+    },
+    {
+      "path": "vendor/8thwall/1.0.0/xr.js",
+      "bytes": 1036695,
+      "sha256": "b3973936862f4cb77ae32d24f253d8a0e8b1de4fa2a0cf688833742889ee829d"
+    },
+    {
+      "path": "vendor/8thwall/1.0.0/LICENSE-AGREEMENT",
+      "bytes": 16010,
+      "sha256": "a2b3be43396a2554a4ab5fefd85086e593e5103f6b1160df4bb3ebb49b033750"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/xrextras.js",
+      "bytes": 131921,
+      "sha256": "2f87a0a4a22821f85399f58d758e69ad7d7fa1868611b3f4b6fb70608a87f678"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/android-fallback-e7f674541b4f5499c9f6.png",
+      "bytes": 15371,
+      "sha256": "a9de3e5c752b5b8510db57bd8948bedd14df76d70a4745d9cd313a0ca0c044a4"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/computer-voxel-81a0a7b770f943336d6b.png",
+      "bytes": 52983,
+      "sha256": "81d9ad5a6d9d9d4511625edd3382b77423349e5ca383d68ef3090616fb1661f6"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/google-chrome-36a08b3267faf39f1efd.png",
+      "bytes": 15034,
+      "sha256": "c8ea003428d905327cb8b9bea5dfd9cc238272968b059be957337f9671cf0646"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/load-grad-212951b3b037207ca630.png",
+      "bytes": 16274,
+      "sha256": "b183cbc642150abb54528d7a5ca53a552b9f0a770f548bc7b2832162d86b0cce"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/safari-fallback-651a4291492cf0a55a49.png",
+      "bytes": 16738,
+      "sha256": "3c5b24d9ec10045d487b6c8639ea507b2a39a78c736e703ebd08b3ae3c45306f"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/safari-icon-9417dd5cd0f9e038ffa9.png",
+      "bytes": 25038,
+      "sha256": "d284a6bb30cdcfdf1d6ecc8760d1c4c580ea0dbe235471dffbcbb5d09d393894"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/settings-icon-ios-b97b7b2ff938e94fe85d.png",
+      "bytes": 44161,
+      "sha256": "c0e86aa59cef3cd9a53bfea1768f016a2532642ffa8eac290c52ce4f093c165f"
+    },
+    {
+      "path": "vendor/8thwall-xrextras/1.0.0/resources/stats.16.min-aab1b1111df515c30351.js",
+      "bytes": 1911,
+      "sha256": "22112903935543a9b1ae0279a15fe0d1047224db1bd2497d3fd99986a6477257"
+    },
+    {
+      "path": "vendor/8thwall/1.0.0/resources/dom-tablet-button.glb",
+      "bytes": 38236,
+      "sha256": "69bb197329b5382906360a58e8a00995dae958667dbe93b002cb51068bfefda6"
+    },
+    {
+      "path": "vendor/8thwall/1.0.0/resources/dom-tablet-frame.glb",
+      "bytes": 43028,
+      "sha256": "ceb73d8655c544b8fe0c60fdf7de9a6c5e20ed9410e5c412f325b183360ed9ed"
+    }
+  ],
+  "unavailableReferences": [
+    {
+      "path": "vendor/8thwall/1.0.0/xr-js-asm.worker.js",
+      "note": "Origin returns app HTML, not a worker; omitted. Not observed being requested in desktop flow."
+    }
+  ]
+}

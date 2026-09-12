@@ -1,9 +1,11 @@
+import { raySegHit, polygonArea } from "./cut-geometry.js"
+
 const SIZE = 640
 let PAPER = "#c41e3a"
 const TABLE = "#fff4e8" // light window through cuts (dark/vermilion paper)
 const GOLD = "#d4a017"
 const VERMILION = "#c41e3a"
-const APP_VERSION = "v20260906-knife"
+const APP_VERSION = "v20260912-studio"
 /** Hole-through fill under cuts: light paper needs dark desk so holes read. */
 function holeFill() {
   const hex = String(PAPER || "#c41e3a").replace("#", "").trim()
@@ -23,6 +25,7 @@ export function createPapercutApp(root) {
     folds: 2,
     sectors: 4,
     drawing: false,
+    pointerId: null,
     last: null,
     brush: 22,
     mode: "cut", // cut | restore | stamp
@@ -45,23 +48,23 @@ export function createPapercutApp(root) {
     <div class="app" data-app="papercut">
       <header class="app-header">
         <div>
-          <h1>剪紙 · 對稱創作</h1>
-          <p>摺邊留紙橋再剪窿；展開係幾何對稱——唔係 AI 評分</p>
+          <a class="brand" href="./" aria-label="剪紙工房首頁"><span class="brand-seal">剪</span><span>剪紙工房<small>PAPER · SYMMETRY · PLAY</small></span></a>
         </div>
-        <span class="ver-chip" title="硬 refresh 後應見到呢個版號">${APP_VERSION}</span>
+        <span class="studio-note" title="${APP_VERSION}">一張紙，無限可能。</span>
       </header>
       <details class="tip-card" open>
-        <summary>課堂 5 分鐘點用</summary>
+        <summary>第一次玩？睇吓點剪</summary>
         <ol>
           <li>選圓形或方形</li>
           <li>摺 2～3 次（夠對稱又唔難）</li>
-          <li>一刀一刀劃；連成密封再撳「確認剪口」</li>
+          <li>畫一個圈，接返起點就會剪走；亦可以分幾刀連成一圈</li>
           <li>左下角睇小「展開」，再撳「預覽成品」</li>
-          <li>展開睇落會密好多、同單格唔一樣——呢個就係摺紙對稱，電腦冇改你剪嘅形</li>
+          <li>一個剪口，展開就變成重複花紋。試試不同摺法！</li>
         </ol>
       </details>
       <div class="panel">
         <div class="steps" id="steps"></div>
+        <div class="section-intro"><p class="eyebrow" id="stepCaption"></p><h1 id="stepTitle"></h1><p id="stepDescription"></p></div>
         <div id="controls"></div>
         <div class="stage-row" id="stageRow">
           <div class="stage tilt-wrap" id="tiltWrap">
@@ -69,11 +72,11 @@ export function createPapercutApp(root) {
             <div class="preview-stage mini hidden" id="previewWrap">
               <div class="preview-label" id="previewLabel">展開</div>
               <canvas id="preview" width="${SIZE}" height="${SIZE}" role="img" aria-label="展開預覽"></canvas>
-              <div class="preview-caption">幾何展開 · 唔係評分</div>
+              <div class="preview-caption">每一刀，都有驚喜</div>
             </div>
           </div>
         </div>
-        <p class="hint" id="hint"></p>
+        <p class="hint" id="hint" role="status" aria-live="polite"></p>
         <div class="row" id="actions"></div>
       </div>
     </div>
@@ -244,7 +247,7 @@ export function createPapercutApp(root) {
     const cx = SIZE / 2, cy = SIZE / 2
     const pack = packetPoly()
 
-    ctx.fillStyle = "#efe6d8"
+    ctx.fillStyle = "#f0ebe3"
     ctx.fillRect(0, 0, SIZE, SIZE)
 
     // stacked muted layers (thickness under the fold pile)
@@ -338,7 +341,7 @@ export function createPapercutApp(root) {
     ctx.fillText(chip, chipR, chipY)
   }
 
-  function resetWedge() {
+  function resetWedge(clearHistory = true) {
     PAPER = state.paperTone || "#f7efe2"
     wctx.clearRect(0, 0, SIZE, SIZE)
     wctx.save()
@@ -347,11 +350,11 @@ export function createPapercutApp(root) {
     wctx.fillStyle = PAPER
     wctx.fillRect(0, 0, SIZE, SIZE)
     wctx.restore()
-    state.history = []
+    if (clearHistory) state.history = []
   }
 
   function snapshot() {
-    state.history.push(wedge.toDataURL("image/png"))
+    state.history.push(wctx.getImageData(0, 0, SIZE, SIZE))
     if (state.history.length > 24) state.history.shift()
   }
 
@@ -461,24 +464,29 @@ export function createPapercutApp(root) {
     ctx.fillRect(10, 10, s - 20, s - 20)
   }
 
-  function composeFull(ctx, withShadow = true) {
-    ctx.fillStyle = "#efe6d8"
-    ctx.fillRect(0, 0, SIZE, SIZE)
-    if (withShadow) {
-      ctx.save()
-      clipPaper(ctx)
-      ctx.shadowColor = "rgba(44,36,32,0.28)"
-      ctx.shadowBlur = 18
-      ctx.shadowOffsetY = 6
-      ctx.fillStyle = holeFill()
+  function composeFull(ctx, withShadow = true, transparent = false) {
+    ctx.clearRect(0, 0, SIZE, SIZE)
+    if (!transparent) {
+      ctx.fillStyle = "#f0ebe3"
       ctx.fillRect(0, 0, SIZE, SIZE)
-      ctx.restore()
+      if (withShadow) {
+        ctx.save()
+        clipPaper(ctx)
+        ctx.shadowColor = "rgba(44,36,32,0.28)"
+        ctx.shadowBlur = 18
+        ctx.shadowOffsetY = 6
+        ctx.fillStyle = holeFill()
+        ctx.fillRect(0, 0, SIZE, SIZE)
+        ctx.restore()
+      }
     }
     // hole fill under paper so cuts read clearly (dark desk on light paper)
     ctx.save()
     clipPaper(ctx)
-    ctx.fillStyle = holeFill()
-    ctx.fillRect(0, 0, SIZE, SIZE)
+    if (!transparent) {
+      ctx.fillStyle = holeFill()
+      ctx.fillRect(0, 0, SIZE, SIZE)
+    }
     const n = state.sectors
     const cx = SIZE / 2, cy = SIZE / 2
     const u = Math.max(0, Math.min(1, state.unfoldT ?? 1))
@@ -504,6 +512,7 @@ export function createPapercutApp(root) {
     }
     ctx.globalAlpha = 1
     ctx.restore()
+    if (transparent) return
     ctx.strokeStyle = GOLD
     ctx.lineWidth = 3
     ctx.beginPath()
@@ -518,7 +527,7 @@ export function createPapercutApp(root) {
   function drawFoldGuide(ctx) {
     const cx = SIZE / 2, cy = SIZE / 2
     const n = state.sectors
-    ctx.fillStyle = "#efe6d8"
+    ctx.fillStyle = "#f0ebe3"
     ctx.fillRect(0, 0, SIZE, SIZE)
 
     ctx.save()
@@ -657,23 +666,24 @@ export function createPapercutApp(root) {
 
   function renderSteps() {
     const labels = [["shape","1 選紙"],["fold","2 摺紙"],["cut","3 剪裁"],["result","4 展開"]]
-    stepsEl.innerHTML = labels.map(([id,t]) => `<span class="${state.step===id?"on":""}">${t}</span>`).join("")
+    const current = labels.findIndex(([id]) => id === state.step)
+    stepsEl.innerHTML = labels.map(([id,t], i) => `<span class="${i === current ? "on" : i < current ? "done" : ""}" ${i === current ? 'aria-current="step"' : ''}><b>${i < current ? "✓" : i + 1}</b>${t.slice(2)}</span>`).join("")
   }
 
   function renderControls() {
     previewWrap.classList.toggle("hidden", state.step !== "cut" || !state.showLivePreview)
     if (state.step === "shape") {
       controls.innerHTML = `<div class="row"><h2>紙形</h2>
-        <button type="button" data-shape="square" class="secondary ${state.shape==="square"?"active":""}">方形（窗花）</button>
-        <button type="button" data-shape="circle" class="secondary ${state.shape==="circle"?"active":""}">圓形（團花）</button></div>
+        <button type="button" data-shape="square" aria-pressed="${state.shape === "square"}" class="shape-card ${state.shape==="square"?"active":""}"><span class="paper-illustration square-paper"><i></i></span><span class="card-name">方形紙<span class="choice-check">✓</span></span><span class="card-detail">剪一扇窗花，留住光影。</span></button>
+        <button type="button" data-shape="circle" aria-pressed="${state.shape === "circle"}" class="shape-card ${state.shape==="circle"?"active":""}"><span class="paper-illustration circle-paper"><i></i></span><span class="card-name">圓形紙<span class="choice-check">✓</span></span><span class="card-detail">摺出團花，讓花紋綻放。</span></button></div>
         <div class="row"><h2>紙色</h2>
-        <button type="button" class="ghost tone" data-tone="#c41e3a" style="background:#c41e3a;color:#fff">硃紅</button>
-        <button type="button" class="ghost tone" data-tone="#efe6d4" style="background:#efe6d4;color:#2c2420">宣紙</button>
-        <button type="button" class="ghost tone" data-tone="#f3e4c8" style="background:#f3e4c8;color:#2c2420">米黄</button>
-        <button type="button" class="ghost tone" data-tone="#f3d9de" style="background:#f3d9de;color:#2c2420">淡粉</button>
-        <button type="button" class="ghost tone" data-tone="#dceee6" style="background:#dceee6;color:#2c2420">淡青</button></div>`
+        <button type="button" class="ghost tone" data-tone="#c41e3a" title="硃紅" style="background:#c41e3a;color:#fff">硃紅</button>
+        <button type="button" class="ghost tone" data-tone="#efe6d4" title="宣紙" style="background:#efe6d4;color:#2c2420">宣紙</button>
+        <button type="button" class="ghost tone" data-tone="#f3e4c8" title="米黃" style="background:#f3e4c8;color:#2c2420">米黄</button>
+        <button type="button" class="ghost tone" data-tone="#f3d9de" title="淡粉" style="background:#f3d9de;color:#2c2420">淡粉</button>
+        <button type="button" class="ghost tone" data-tone="#dceee6" title="淡青" style="background:#dceee6;color:#2c2420">淡青</button></div>`
       controls.querySelectorAll("[data-shape]").forEach((b) => {
-        b.onclick = () => { state.shape = b.dataset.shape; render() }
+        b.onclick = () => { state.shape = b.dataset.shape; state.folds = Math.min(state.folds, state.shape === "square" ? 3 : 4); state.sectors = sectorsFromFolds(state.folds); render() }
       })
       controls.querySelectorAll("[data-tone]").forEach((b) => {
         b.onclick = () => { state.paperTone = b.dataset.tone; PAPER = state.paperTone; render() }
@@ -687,15 +697,15 @@ export function createPapercutApp(root) {
       let opts = ""
       for (let f = 1; f <= maxFolds; f++) {
         const sec = sectorsFromFolds(f)
-        opts += `<button type="button" class="secondary ${state.folds===f?"active":""}" data-f="${f}">摺 ${f} 次（${sec} 等份）</button>`
+        opts += `<button type="button" aria-pressed="${state.folds === f}" class="secondary fold-card ${state.folds===f?"active":""}" data-f="${f}"><span class="fold-number">${f}<small>摺</small></span><span>${sec} 層紙<span class="fold-detail">${f === 1 ? "簡單開始" : f === 2 ? "初次玩推薦" : f === 3 ? "豐富對稱" : "細緻團花"}</span></span><span class="choice-check">✓</span></button>`
       }
       controls.innerHTML = `<div class="row"><h2>摺幾多次</h2>${opts}</div>`
       controls.querySelectorAll("[data-f]").forEach((b) => {
         b.onclick = () => { state.folds = Number(b.dataset.f); state.sectors = sectorsFromFolds(state.folds); render() }
       })
       hint.textContent = state.shape === "square"
-        ? "方形：深色塊＝摺完最上面嗰包（1次對半、2次一角、3次對角三角）。淺色＝摺埋睇唔到。"
-        : "圓形：深色扇形＝摺起要剪嗰格；淺色＝摺埋。建議先試摺 2～3 次。"
+        ? "深色係摺起後要剪嗰部分；虛線係摺邊。"
+        : "深色扇形係要剪嗰部分。第一次玩，試試摺 2 次。"
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">下一步：開始剪</button>`
       actions.querySelector("#back").onclick = () => { state.step = "shape"; render() }
@@ -722,33 +732,36 @@ export function createPapercutApp(root) {
           return
         }
         const prev = state.history.pop(); if (!prev) return
-        const img = new Image()
-        img.onload = () => { wctx.clearRect(0,0,SIZE,SIZE); wctx.drawImage(img,0,0); drawView() }
-        img.src = prev
+        wctx.putImageData(prev, 0, 0)
+        syncCutActions()
+        drawView()
       }
       controls.querySelector("#clear").onclick = () => {
         state.cutEdges = []
         state.strokePts = []
         snapshot()
-        resetWedge()
+        resetWedge(false)
         syncCutActions()
         drawView()
       }
       const conf = controls.querySelector("#confirmCut")
       if (conf) conf.onclick = () => confirmCutEdges()
       hint.textContent = CUT_HINT
+      syncCutActions()
       actions.innerHTML = `<button type="button" class="ghost" id="back">上一步</button>
         <button type="button" class="primary" id="next">預覽成品</button>`
       actions.querySelector("#back").onclick = () => { state.step = "fold"; render() }
       actions.querySelector("#next").onclick = () => {
+        if (state.cutEdges.length) { flashSealHint(); return }
         state.step = "result"
-        state.unfoldT = 0
+        state.unfoldT = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 0
         render()
         const t0 = performance.now()
         const dur = 900
         const anim = (now) => {
           if (state.step !== "result") return
-          state.unfoldT = Math.min(1, (now - t0) / dur)
+          const t = Math.min(1, (now - t0) / dur)
+          state.unfoldT = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 1 : 1 - (1 - t) ** 3
           drawView()
           if (state.unfoldT < 1) requestAnimationFrame(anim)
           else { state.unfoldT = 1; drawView() }
@@ -822,7 +835,7 @@ export function createPapercutApp(root) {
 
   function drawView() {
     if (state.step === "shape") {
-      vctx.fillStyle = "#efe6d8"
+      vctx.fillStyle = "#f0ebe3"
       vctx.fillRect(0, 0, SIZE, SIZE)
       vctx.fillStyle = PAPER
       vctx.strokeStyle = VERMILION
@@ -899,12 +912,12 @@ export function createPapercutApp(root) {
       }
       if (state.showLivePreview) {
         const lab = root.querySelector("#previewLabel")
-        if (lab) lab.textContent = `展開 · ${state.sectors} 等份`
+        if (lab) lab.textContent = `展開 · ${state.sectors} 份`
         const u = state.unfoldT; state.unfoldT = 1; composeFull(pctx); state.unfoldT = u
       }
     } else {
       vctx.save()
-      vctx.fillStyle = "#efe6d8"
+      vctx.fillStyle = "#f0ebe3"
       vctx.fillRect(0, 0, SIZE, SIZE)
       vctx.translate(SIZE/2, SIZE/2)
       vctx.rotate(resultAngle)
@@ -937,7 +950,7 @@ export function createPapercutApp(root) {
       let rel = a + Math.PI / 2
       while (rel < 0) rel += Math.PI * 2
       while (rel >= Math.PI * 2) rel -= Math.PI * 2
-      return rel <= (Math.PI * 2) / state.sectors + 0.06
+      return Math.hypot(x - cx, y - cy) <= SIZE * 0.46 && rel <= (Math.PI * 2) / state.sectors + 0.06
     }
     return false
   }
@@ -1008,19 +1021,6 @@ export function createPapercutApp(root) {
     return inside
   }
 
-  function raySegHit(cx, cy, angle, p1, p2) {
-    const rx = Math.cos(angle), ry = Math.sin(angle)
-    const sx = p2.x - p1.x, sy = p2.y - p1.y
-    const den = rx * sy - ry * sx
-    if (Math.abs(den) < 1e-8) return null
-    const qx = p1.x - cx, qy = p1.y - cy
-    const tRay = (qx * sy - qy * sx) / den
-    const tSeg = (rx * qy - ry * qx) / den
-    if (tRay >= 0 && tSeg >= 0 && tSeg <= 1) {
-      return { x: cx + rx * tRay, y: cy + ry * tRay, tRay }
-    }
-    return null
-  }
 
   function strokeHitsRay(pts, angle, cx, cy, tol) {
     let best = null, bestD = tol
@@ -1045,7 +1045,7 @@ export function createPapercutApp(root) {
   }
 
   const EDGE_SNAP = 28
-  const CUT_HINT = "一刀一刀劃；連成密封再撳『確認剪口』。尖角一刀過兩條摺邊會即刻飛走。"
+  const CUT_HINT = "畫圈接返起點，放手即剪走；分幾刀亦得。未封口會保留虛線，撳「復原」可取消上一刀。"
 
   function isSealedLoop(pts) {
     if (!pts || pts.length < 8) return false
@@ -1108,7 +1108,7 @@ export function createPapercutApp(root) {
   }
 
   function commitHoleFromPoly(pts) {
-    if (!pts || pts.length < 3) return false
+    if (!pts || pts.length < 3 || polygonArea(pts) < 24) return false
     snapshot()
     wctx.save()
     clipPacket(wctx)
@@ -1138,7 +1138,7 @@ export function createPapercutApp(root) {
       flashSealHint()
       return
     }
-    commitHoleFromPoly(poly)
+    if (!commitHoleFromPoly(poly)) { flashSealHint(); return }
     state.cutEdges = []
     state.strokePts = []
     syncCutActions()
@@ -1149,6 +1149,13 @@ export function createPapercutApp(root) {
     if (state.step !== "cut") return
     const row = controls.querySelector("#cutActions")
     if (!row) return
+    clearTimeout(flashSealHint._t)
+    hint.classList.remove("hint-flash")
+    row.querySelector("#undo").disabled = !state.cutEdges.length && !state.history.length
+    row.querySelector("#clear").disabled = !state.cutEdges.length && !state.history.length
+    hint.textContent = state.cutEdges.length
+      ? `仲有 ${state.cutEdges.length} 刀未封口：沿虛線接返起點，完成後先預覽。`
+      : CUT_HINT
     let conf = row.querySelector("#confirmCut")
     if (state.cutEdges.length >= 1) {
       if (!conf) {
@@ -1197,13 +1204,13 @@ export function createPapercutApp(root) {
 
   function flashSealHint() {
     const prev = hint.textContent
-    hint.textContent = "要連成密封剪口先剪得走——再撳『確認剪口』"
+    hint.textContent = "剪口要圍出面積並接返起點；沿虛線繼續畫，或撳「復原」取消。"
     hint.classList.add("hint-flash")
     clearTimeout(flashSealHint._t)
     flashSealHint._t = setTimeout(() => {
       hint.classList.remove("hint-flash")
       if (state.step === "cut") {
-        hint.textContent = CUT_HINT
+        syncCutActions()
       } else {
         hint.textContent = prev
       }
@@ -1265,7 +1272,8 @@ export function createPapercutApp(root) {
     if (state.step === "result") {
       return // finished artwork stays still
     }
-    if (state.step !== "cut") return
+    if (state.step !== "cut" || state.drawing || e.isPrimary === false || e.button !== 0) return
+    state.pointerId = e.pointerId
     e.preventDefault()
     if (view.setPointerCapture && e.pointerId != null) {
       try { view.setPointerCapture(e.pointerId) } catch (_) {}
@@ -1282,11 +1290,16 @@ export function createPapercutApp(root) {
   }
   function onMove(e) {
     if (state.step === "result") return
-    if (!state.drawing || state.step !== "cut" || state.mode === "stamp") return
+    if (!state.drawing || e.pointerId !== state.pointerId || state.step !== "cut" || state.mode === "stamp") return
     e.preventDefault()
     paintAt(pointerPos(e))
   }
-  function onUp() {
+  function onUp(e) {
+    if (e.pointerId !== state.pointerId) return
+    if (e.type === "pointercancel") {
+      state.drawing = false
+      state.strokePts = []
+    }
     if (state.drawing && state.mode === "cut" && state.strokePts.length >= 2) {
       const stroke = state.strokePts.slice()
       if (isTipChopStroke(stroke)) {
@@ -1296,13 +1309,13 @@ export function createPapercutApp(root) {
         state.cutEdges.push(stroke)
         // auto-commit only when edge chain endpoints seal (not loose single-lasso nearLoop)
         const poly = sealedPolygonFromEdges(state.cutEdges, EDGE_SNAP)
-        if (poly) {
-          commitHoleFromPoly(poly)
+        if (poly && commitHoleFromPoly(poly)) {
           state.cutEdges = []
         }
       }
     }
     state.drawing = false
+    state.pointerId = null
     state.last = null
     state.strokePts = []
     draggingResult = false
@@ -1316,14 +1329,37 @@ export function createPapercutApp(root) {
   view.addEventListener("pointerup", onUp)
   view.addEventListener("pointercancel", onUp)
 
-  function tickIdle() {
-    // finished artwork stays still — no idle spin / tilt
-    requestAnimationFrame(tickIdle)
-  }
 
+  let previousScreen = null
+  let previousFolds = null
   function render() {
+    const app = root.querySelector(".app")
+    app.dataset.step = state.step
+    app.style.setProperty("--paper-tone", state.paperTone)
+    const copy = {
+      shape: ["01 / 選一張紙", "靈感，從一張紙開始。", "選個喜歡的形狀與顏色，做一幅屬於你的窗花。"],
+      fold: ["02 / 摺出可能", "每一摺，多一點驚喜。", "摺得越多，展開後的花紋越豐富。"],
+      cut: ["03 / 自由剪裁", "慢慢剪，讓光透進來。", `${state.shape === "circle" ? "圓形紙" : "方形紙"} · 摺 ${state.folds} 次 · ${state.sectors} 層`],
+      result: ["04 / 你的作品", "看，花紋綻放了。", "每一個剪口，都是你親手留下的創意。"],
+    }[state.step]
+    if (copy) {
+      root.querySelector("#stepCaption").textContent = copy[0]
+      root.querySelector("#stepTitle").textContent = copy[1]
+      root.querySelector("#stepDescription").textContent = copy[2]
+    }
+    if (state.step === "fold" && previousFolds !== state.folds && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      view.animate([{ transform: "perspective(800px) rotateY(-16deg) scale(.96)", opacity: .55 }, { transform: "perspective(800px) rotateY(0) scale(1)", opacity: 1 }], { duration: 480, easing: "cubic-bezier(.2,.8,.2,1)" })
+    }
+    previousFolds = state.folds
+    if (previousScreen !== state.step) {
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        root.querySelector(".section-intro").animate([{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 400, easing: "ease-out" })
+        tiltWrap.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450 })
+      }
+      previousScreen = state.step
+    }
     tiltWrap.style.transform = ""
-    if (tipCard) tipCard.open = state.step === "shape" || state.step === "fold"
+    if (tipCard) tipCard.open = false
     view.style.cursor = state.step === "result" ? "default" : "crosshair"
     tiltWrap.classList.toggle("is-result", state.step === "result")
     tiltWrap.classList.toggle("artwork-frame", state.step === "result")
@@ -1333,7 +1369,10 @@ export function createPapercutApp(root) {
   }
 
 
+  let closeCamera = null
+
   function openCameraSticker() {
+    closeCamera?.()
     let overlay = root.querySelector(".cam-overlay")
     if (overlay) { overlay.remove() }
     overlay = document.createElement("div")
@@ -1344,11 +1383,11 @@ export function createPapercutApp(root) {
           <video id="camVid" playsinline autoplay muted></video>
           <canvas id="camHud" width="640" height="480"></canvas>
         </div>
-        <p class="cam-hint">拖動剪紙擺喺現實景物上；撳放大／縮小。無相機就用下載圖片。</p>
+        <p class="cam-hint">相機疊圖：拖動剪紙、放大／縮小；剪口可透出背景，作品唔會固定喺現實平面。</p>
         <div class="row cam-actions">
           <button type="button" class="ghost" id="camSmaller">縮小</button>
           <button type="button" class="ghost" id="camBigger">放大</button>
-          <button type="button" class="secondary" id="camShot">擷圖下載</button>
+          <button type="button" class="secondary" id="camShot" disabled>擷圖下載</button>
           <button type="button" class="primary" id="camClose">關閉</button>
         </div>
       </div>`
@@ -1359,11 +1398,11 @@ export function createPapercutApp(root) {
     let scale = 0.45
     let ox = 0.5, oy = 0.5
     let dragging = false, lx = 0, ly = 0
-    let stream = null
+    let stream = null, closed = false
     const paper = document.createElement("canvas")
     paper.width = SIZE; paper.height = SIZE
     const prev = state.unfoldT; state.unfoldT = 1
-    composeFull(paper.getContext("2d"), true)
+    composeFull(paper.getContext("2d"), false, true)
     state.unfoldT = prev
 
     function layout() {
@@ -1392,16 +1431,20 @@ export function createPapercutApp(root) {
         draw()
       } else if (type === "up") dragging = false
     }
-    hud.addEventListener("pointerdown", (e) => { e.preventDefault(); onPointer(e, "down") })
+    hud.addEventListener("pointerdown", (e) => { e.preventDefault(); hud.setPointerCapture(e.pointerId); onPointer(e, "down") })
     hud.addEventListener("pointermove", (e) => onPointer(e, "move"))
     hud.addEventListener("pointerup", () => onPointer({}, "up"))
+    hud.addEventListener("pointercancel", () => onPointer({}, "up"))
     overlay.querySelector("#camBigger").onclick = () => { scale = Math.min(0.9, scale + 0.08); draw() }
     overlay.querySelector("#camSmaller").onclick = () => { scale = Math.max(0.2, scale - 0.08); draw() }
     overlay.querySelector("#camShot").onclick = () => {
       const out = document.createElement("canvas")
       out.width = hud.width; out.height = hud.height
       const o = out.getContext("2d")
-      o.drawImage(video, 0, 0, out.width, out.height)
+      if (video.readyState < 2) return
+      const ratio = Math.max(out.width / video.videoWidth, out.height / video.videoHeight)
+      const sw = out.width / ratio, sh = out.height / ratio
+      o.drawImage(video, (video.videoWidth - sw) / 2, (video.videoHeight - sh) / 2, sw, sh, 0, 0, out.width, out.height)
       o.drawImage(hud, 0, 0)
       const a = document.createElement("a")
       a.download = `papercut-cam-${Date.now()}.png`
@@ -1409,9 +1452,14 @@ export function createPapercutApp(root) {
       a.click()
     }
     const close = () => {
+      closed = true
+      window.removeEventListener("resize", layout)
       if (stream) stream.getTracks().forEach((tr) => tr.stop())
+      video.srcObject = null
       overlay.remove()
+      closeCamera = null
     }
+    closeCamera = close
     overlay.querySelector("#camClose").onclick = close
 
     const tryCam = async () => {
@@ -1420,12 +1468,17 @@ export function createPapercutApp(root) {
           video: { facingMode: { ideal: "environment" } },
           audio: false,
         })
+        if (closed) { stream.getTracks().forEach((tr) => tr.stop()); return }
         video.srcObject = stream
         await video.play()
+        if (closed) return
+        overlay.querySelector("#camShot").disabled = false
         layout()
         window.addEventListener("resize", layout, { once: false })
         overlay._onResize = layout
       } catch (err) {
+        if (closed) return
+        if (stream) stream.getTracks().forEach((tr) => tr.stop())
         overlay.querySelector(".cam-hint").textContent =
           "開唔到相機（權限或裝置唔支援）。可以用「下載圖片」再喺相簿疊圖。"
         video.style.display = "none"
@@ -1434,12 +1487,12 @@ export function createPapercutApp(root) {
         draw()
       }
     }
+    layout()
     tryCam()
   }
 
   state.sectors = sectorsFromFolds(state.folds)
   resetWedge()
   render()
-  requestAnimationFrame(tickIdle)
-  return { destroy() { root.innerHTML = "" } }
+  return { destroy() { closeCamera?.(); clearTimeout(flashSealHint._t); state.step = "destroyed"; root.innerHTML = "" } }
 }
