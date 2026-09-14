@@ -5,6 +5,10 @@ state.lesson = null;
 state.pending = [];
 state.history = [];
 state.remaining = [];
+state.holes = [];
+state.tool = 'scissors';
+state.stampKind = 'circle';
+state.stampSize = 24;
 
 function initialPaper(){
   const {a0,a1}=params();
@@ -13,7 +17,30 @@ function initialPaper(){
     .filter((p,i,all)=>G.distance(p,all[(i+1)%all.length])>.001);
 }
 function resetScissors(){
-  activePointer=null;state.pending=[];state.history=[];state.remaining=initialPaper();
+  activePointer=null;state.pending=[];state.history=[];state.remaining=initialPaper();state.holes=[];
+}
+function pushHistory(){
+  state.history.push({remaining:state.remaining,holes:state.holes.slice(),cuts:state.cuts.slice()});
+}
+function restoreHistory(){
+  const snap=state.history.pop();
+  if(!snap)return;
+  state.remaining=snap.remaining;
+  state.holes=snap.holes;
+  state.cuts=snap.cuts;
+}
+function syncToolBar(){
+  const bar=$('#tool-mode-bar'),shapes=$('#stamp-shapes');
+  const free=!state.lesson;
+  if(bar)bar.hidden=!free||state.mode!=='cut';
+  if(!free)state.tool='scissors';
+  if(shapes)shapes.hidden=!(free&&state.tool==='stamp'&&state.mode==='cut');
+  document.querySelectorAll('#tool-mode-bar [data-tool]').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.tool===state.tool);
+  });
+  document.querySelectorAll('#stamp-shapes [data-stamp]').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.stamp===state.stampKind);
+  });
 }
 function currentLesson(){return LESSONS[state.lesson?.id ?? 0];}
 function currentStep(){return currentLesson().steps[Math.min(state.cuts.length,currentLesson().steps.length-1)];}
@@ -71,12 +98,13 @@ function bladeMarkup(){
 function drawBlade(){
   $('#thumbsvg').innerHTML=orientationThumbMarkup();
   const layer=$('#scissor-overlay');if(layer)layer.innerHTML=bladeMarkup();
-  $('#btn-undo').disabled=!(state.pending.length||state.cuts.length);
+  $('#btn-undo').disabled=!(state.pending.length||state.cuts.length||state.holes.length);
 }
 const baseRender=render;
 render=function(){
   baseRender();
   lessonPanel();
+  syncToolBar();
   if(state.mode==='cut'){
     const group=document.createElementNS('http://www.w3.org/2000/svg','g');
     group.setAttribute('transform',`rotate(${-params().w/2} ${C} ${C})`);
@@ -84,10 +112,11 @@ render=function(){
     group.innerHTML=guideMarkup()+'<g id="scissor-overlay"></g>';
     svg.appendChild(group);drawBlade();
     if(state.pending.length)$('#hint').textContent='仲未剪斷。由剪刀尖接住剪，接通紙邊先會甩。';
+    else if(!state.lesson&&state.tool==='stamp')$('#hint').textContent='喺紙入面撳一下，印出圓形或正方形窿（唔可以貼邊）。';
   }
   $('#btn-mode').disabled=!!(state.lesson&&['intro','cut','between'].includes(state.lesson.phase));
   if(state.lesson?.phase==='predict'){$('#btn-mode').disabled=false;$('#btn-mode').textContent=state.lesson.guess===undefined?'先揀上面嘅答案 ↑':'展開作品';$('#hint').textContent='仲有一步：按上面其中一個答案，就可以展開作品。';}
-  $('#btn-clear').disabled=!(state.pending.length||state.cuts.length);
+  $('#btn-clear').disabled=!(state.pending.length||state.cuts.length||state.holes.length);
   $('#back-folds').textContent=state.lesson?'‹ 返回':'‹ 摺法';
 };
 function startLesson(id=0){
@@ -134,7 +163,7 @@ $('#btn-mode').addEventListener('click',togglePreview);
 $('#thumbwrap').addEventListener('click',togglePreview);
 $('#btn-undo').addEventListener('click',()=>{
   if(state.pending.length)state.pending=[];
-  else if(state.cuts.length){state.cuts.pop();state.remaining=state.history.pop();}
+  else if(state.history.length)restoreHistory();
   if(state.lesson&&state.lesson.phase!=='intro')state.lesson={id:state.lesson.id,phase:'cut'};
   state.mode='cut';render();
 });
@@ -150,10 +179,38 @@ function onGuide(p){
   for(let i=1;i<guide.length;i++)if(G.nearest([guide[i-1],guide[i]],p).distance<currentStep().tolerance)return true;
   return false;
 }
+function applyStampAt(point){
+  const shape={kind:state.stampKind,cx:point.x,cy:point.y,size:state.stampSize};
+  const result=G.punchStamp(state.remaining,shape);
+  if(result.status!=='ok'){
+    $('#hint').textContent=result.status==='outside'
+      ?'印章要完全喺紙入面，唔可以貼邊或伸出紙外。'
+      :'呢度印唔到，試移入紙中間少少。';
+    return;
+  }
+  for(const hole of state.holes){
+    if(result.removed.some(p=>G.inside(hole,p))||G.inside(hole,{x:shape.cx,y:shape.cy})){
+      $('#hint').textContent='唔好疊喺已經印出嘅窿上面。';
+      return;
+    }
+  }
+  pushHistory();
+  state.holes=state.holes.concat([result.removed]);
+  state.pending=[];
+  render();
+  $('#hint').textContent='印好了！展開預覽會見到對稱嘅窿。';
+  const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+  g.setAttribute('transform',`rotate(${-params().w/2} ${C} ${C})`);g.setAttribute('pointer-events','none');
+  g.innerHTML=`<path class="paper-drop" d="${polyD(result.removed)}" fill="var(--red)" stroke="var(--red-deep)" stroke-width="2"/>`;
+  svg.appendChild(g);setTimeout(()=>g.remove(),700);
+}
 svg.addEventListener('pointerdown',e=>{
   if(state.mode!=='cut'||activePointer!==null||e.isPrimary===false||(e.pointerType==='mouse'&&e.button!==0))return;
   if(state.lesson&&state.lesson.phase!=='cut')return;
   const point=modelPt(e),tol=tolerance();
+  if(!state.lesson&&state.tool==='stamp'){
+    applyStampAt(point);e.preventDefault();return;
+  }
   if(state.pending.length){
     if(G.distance(point,state.pending[state.pending.length-1])>tol*1.5){$('#hint').textContent='由剪刀尖接住剪；想重新開始，可以按「復原」。';return;}
   }else{
@@ -188,7 +245,7 @@ function moveBlade(e){
         $('#hint').textContent='沿整條引導線剪到「剪出」，轉角也要跟住剪。';return;
       }
     }
-    state.history.push(state.remaining);state.remaining=result.remaining;state.cuts.push(result.removed);
+    pushHistory();state.remaining=result.remaining;state.cuts.push(result.removed);
     state.pending=[];activePointer=null;
     if(state.lesson)state.lesson.phase=state.cuts.length<currentLesson().steps.length?'between':'predict';
     render();
@@ -212,4 +269,21 @@ svg.addEventListener('pointerup',e=>{
 svg.addEventListener('pointercancel',e=>{
   if(activePointer!==e.pointerId)return;
   state.pending=strokeBefore;activePointer=null;render();
+});
+
+$('#tool-mode-bar')?.addEventListener('click',e=>{
+  const tool=e.target.closest('[data-tool]')?.dataset.tool;
+  const stamp=e.target.closest('[data-stamp]')?.dataset.stamp;
+  if(tool){
+    state.tool=tool;
+    state.pending=[];
+    render();
+    $('#hint').textContent=tool==='stamp'
+      ?'喺紙入面撳一下，印出圓形或正方形窿（唔可以貼邊）。'
+      :'由紙邊入剪，剪到另一條邊，較細塊紙先會掉落。';
+  }
+  if(stamp){
+    state.stampKind=stamp;
+    syncToolBar();
+  }
 });

@@ -42,3 +42,25 @@ test('guided curved cut leaves a center-connected petal wedge',()=>{
  assert.equal(cut.status,'split');assert(G.inside(cut.remaining,p(501,490)));
  assert(Math.abs(G.area(cut.remaining)+G.area(cut.removed)-G.area(poly))<.001);
 });
+test('interior circle stamp punches a hole without changing outer poly',()=>{
+ const punched=G.punchStamp(square,{kind:'circle',cx:50,cy:50,size:12});
+ assert.equal(punched.status,'ok');
+ assert.equal(punched.remaining,square);
+ assert.equal(punched.removed.length,24);
+ assert(G.inside(square,p(50,50)));
+ assert(G.area(punched.removed)>100);
+});
+test('stamp outside or overlapping the edge is rejected',()=>{
+ assert.equal(G.punchStamp(square,{kind:'circle',cx:50,cy:50,size:48}).status,'outside');
+ assert.equal(G.punchStamp(square,{kind:'circle',cx:5,cy:5,size:10}).status,'outside');
+ assert.equal(G.punchStamp(square,{kind:'square',cx:95,cy:50,size:10}).status,'outside');
+ assert.equal(G.punchStamp(square,{kind:'circle',cx:-10,cy:50,size:8}).status,'outside');
+});
+test('square stamp fully inside is accepted',()=>{
+ const punched=G.punchStamp(square,{kind:'square',cx:40,cy:60,size:10});
+ assert.equal(punched.status,'ok');
+ assert.equal(punched.removed.length,4);
+});
+test('scissors still invalid when starting in the interior',()=>{
+ assert.equal(G.trace(square,[p(30,30),p(60,30),p(60,60),p(30,30)]).status,'invalid');
+});

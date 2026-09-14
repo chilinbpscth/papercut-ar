@@ -1,6 +1,7 @@
 /* Polygon scissors: an open edge-to-edge cut splits the remaining sheet. */
 (function(root){
   const EPS=1e-7;
+  const STAMP_MARGIN=3;
   const distance=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
   const cross=(a,b)=>a.x*b.y-a.y*b.x;
   const sub=(a,b)=>({x:a.x-b.x,y:a.y-b.y});
@@ -74,6 +75,57 @@
     }
     return {status:'pending'};
   }
-  const api={area,nearest,inside,intersection,trace,distance};
+  /** Closed stamp outline. size = radius (circle) or half-side (square). */
+  function stampOutline(shape){
+    const {kind,cx,cy,size}=shape;
+    if(!(size>0)||!Number.isFinite(cx)||!Number.isFinite(cy))return null;
+    if(kind==='circle'){
+      const n=24,out=[];
+      for(let i=0;i<n;i++){
+        const a=i/n*Math.PI*2;
+        out.push({x:cx+size*Math.cos(a),y:cy+size*Math.sin(a)});
+      }
+      return out;
+    }
+    if(kind==='square'){
+      return [
+        {x:cx-size,y:cy-size},{x:cx+size,y:cy-size},
+        {x:cx+size,y:cy+size},{x:cx-size,y:cy+size}
+      ];
+    }
+    return null;
+  }
+  function strictlyInside(poly,p,margin){
+    if(nearest(poly,p).distance<margin)return false;
+    if(nearest(poly,p).distance<EPS)return false;
+    let yes=false;
+    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+      const a=poly[i],b=poly[j];
+      if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)yes=!yes;
+    }
+    return yes;
+  }
+  /**
+   * Punch an interior stamp hole. Outer poly stays a simple polygon;
+   * caller stores removed outline in state.holes for evenodd / mask rendering.
+   */
+  function punchStamp(poly,shape){
+    if(!poly||poly.length<3||!shape)return {status:'invalid'};
+    const stamp=stampOutline(shape);
+    if(!stamp)return {status:'invalid'};
+    const margin=STAMP_MARGIN;
+    const center={x:shape.cx,y:shape.cy};
+    if(!strictlyInside(poly,center,margin))return {status:'outside'};
+    for(const p of stamp){
+      if(!strictlyInside(poly,p,margin))return {status:'outside'};
+    }
+    // Sample edge midpoints so a large stamp can't clip a concave bay.
+    for(let i=0;i<stamp.length;i++){
+      const mid=lerp(stamp[i],stamp[(i+1)%stamp.length],.5);
+      if(!strictlyInside(poly,mid,margin))return {status:'outside'};
+    }
+    return {status:'ok',remaining:poly,removed:stamp};
+  }
+  const api={area,nearest,inside,intersection,trace,distance,stampOutline,punchStamp};
   if(typeof module!=='undefined')module.exports=api;else root.CutGeometry=api;
 })(typeof globalThis!=='undefined'?globalThis:this);

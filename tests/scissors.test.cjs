@@ -72,3 +72,22 @@ test('preview button points to unanswered question and reveals after an answer',
  a.run('state.lesson.guess=1');a.click('#btn-mode');
  assert.equal(a.run('state.mode'),'preview');assert.equal(a.run('state.lesson.phase'),'done');
 });
+test('free-play stamp punches an interior hole and undo restores it',()=>{
+ const a=app();
+ a.run("state.shape='square';state.folds=2;state.mode='cut';state.lesson=null;resetScissors();state.tool='stamp';state.stampKind='circle';render()");
+ const before=a.run('state.remaining.length');
+ a.emit('pointerdown',{x:700,y:280});
+ assert.equal(a.run('state.holes.length'),1);
+ assert.equal(a.run('state.remaining.length'),before);
+ assert(a.run("previewMarkup('pv')").includes('Z'));
+ a.click('#btn-undo');
+ assert.equal(a.run('state.holes.length'),0);
+});
+test('lesson mode forces scissors and ignores stamp tool clicks on paper',()=>{
+ const a=app();
+ a.run("startLesson();state.lesson.phase='cut';state.tool='stamp';render()");
+ assert.equal(a.run('state.tool'),'scissors');
+ a.emit('pointerdown',{x:600,y:250});
+ assert.equal(a.run('state.holes.length'),0);
+ assert.equal(a.run('state.pending.length'),0);
+});

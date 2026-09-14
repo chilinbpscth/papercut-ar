@@ -215,6 +215,12 @@ button:active:not(:disabled){filter:brightness(.92);}
 @media(prefers-reduced-motion:reduce){.answer-hand{animation:none;}}
 @media(max-height:650px){#lesson-panel.needs-answer,#lesson-panel:has(.start-box){max-height:45dvh;}}
 @media(max-height:650px){.rotation-sphere{width:62px;height:62px;}.rotation-globe{width:52px;height:52px;}.rotation-panel{padding:6px;}.rotation-options p,.rotation-values{display:none;}}
+
+.tool-mode-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 8px;}
+.tool-mode-bar[hidden]{display:none;}
+.tool-mode-bar .tool.active{border-color:var(--red);background:var(--red);color:#FBF6EC;font-weight:600;}
+.tool-mode-bar .stamp-shapes{display:flex;gap:6px;margin-left:4px;}
+.tool-mode-bar .stamp-shapes[hidden]{display:none;}
 </style>
 <div id="app">
 
@@ -266,6 +272,14 @@ button:active:not(:disabled){filter:brightness(.92);}
       </div>
     </div>
     <p class="hint" id="hint" role="status" aria-live="polite"></p>
+    <div class="tool-mode-bar" id="tool-mode-bar" hidden>
+      <button type="button" class="tool active" id="btn-tool-scissors" data-tool="scissors">剪刀</button>
+      <button type="button" class="tool" id="btn-tool-stamp" data-tool="stamp">印章</button>
+      <span class="stamp-shapes" id="stamp-shapes" hidden>
+        <button type="button" class="tool active" id="btn-stamp-circle" data-stamp="circle">圓形</button>
+        <button type="button" class="tool" id="btn-stamp-square" data-stamp="square">正方形</button>
+      </span>
+    </div>
     <div class="toolbar">
       <button class="tool" id="btn-undo">復原</button>
       <button class="tool" id="btn-clear">全部重來</button>
@@ -390,7 +404,9 @@ function polylineD(pts){
 
 /* ---------- 畫面組件 ---------- */
 function cutsMarkup(){
-  return state.cuts.map(p => `<path d="${cutPathD(p)}" fill="#000"/>`).join('');
+  const holes = state.holes || [];
+  return state.cuts.map(p => `<path d="${cutPathD(p)}" fill="#000"/>`).join('')
+    + holes.map(p => `<path d="${cutPathD(p)}" fill="#000"/>`).join('');
 }
 function previewMarkup(prefix){
   const paper = paperPathD(state.shape), wedge = wedgePathD();
@@ -542,8 +558,8 @@ function render(){
     $('#btn-mode').textContent = '繼續剪裁';
     $('#hint').textContent = '展開後的成品。可隨時返回繼續剪裁。';
   }
-  $('#btn-undo').disabled = state.cuts.length === 0;
-  $('#btn-clear').disabled = state.cuts.length === 0;
+  $('#btn-undo').disabled = state.cuts.length === 0 && !(state.holes && state.holes.length);
+  $('#btn-clear').disabled = state.cuts.length === 0 && !(state.holes && state.holes.length);
   $('#btn-ar').hidden = state.mode !== 'preview';
 }
 function rotPt(p, deg){
