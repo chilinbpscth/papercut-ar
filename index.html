@@ -215,6 +215,34 @@ button:active:not(:disabled){filter:brightness(.92);}
 @media(prefers-reduced-motion:reduce){.answer-hand{animation:none;}}
 @media(max-height:650px){#lesson-panel.needs-answer,#lesson-panel:has(.start-box){max-height:45dvh;}}
 @media(max-height:650px){.rotation-sphere{width:62px;height:62px;}.rotation-globe{width:52px;height:52px;}.rotation-panel{padding:6px;}.rotation-options p,.rotation-values{display:none;}}
+
+/* ---------- 紀念海報（裱畫） ---------- */
+#mp-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:60;
+  display:flex;align-items:flex-end;justify-content:center;}
+#mp-modal[hidden]{display:none;}
+.mp-sheet{background:var(--ground);border-radius:18px 18px 0 0;width:100%;max-width:720px;
+  max-height:min(92dvh,860px);display:flex;flex-direction:column;box-shadow:var(--shadow);
+  padding:14px 16px calc(16px + env(safe-area-inset-bottom));overflow:auto;}
+.mp-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.mp-top .t{font-weight:600;font-size:17px;}
+#mp-close{background:var(--surface);border:1px solid var(--line);color:var(--ink);
+  border-radius:50%;width:36px;height:36px;font:inherit;font-size:16px;cursor:pointer;}
+.mp-preview-wrap{background:#2a241c;border-radius:12px;border:1px solid var(--line);
+  display:grid;place-items:center;padding:10px;min-height:180px;}
+#mp-canvas{width:100%;max-height:min(42dvh,360px);height:auto;display:block;border-radius:4px;
+  background:#1a1612;}
+.mp-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0 8px;}
+.mp-fields label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);}
+.mp-fields label.span2{grid-column:1/-1;}
+.mp-fields input{font:inherit;font-size:15px;padding:10px 12px;border-radius:10px;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);}
+.mp-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.mp-actions .grow{flex:1;min-width:8px;}
+.mp-hint{font-size:12px;color:var(--muted);text-align:center;margin:8px 0 0;}
+#mp-video{display:none;width:100%;max-height:min(36dvh,280px);border-radius:10px;background:#000;}
+#mp-video.active{display:block;}
+#mp-file{display:none;}
+@media(max-width:480px){.mp-fields{grid-template-columns:1fr;}}
 </style>
 <div id="app">
 
@@ -271,6 +299,7 @@ button:active:not(:disabled){filter:brightness(.92);}
       <button class="tool" id="btn-clear">全部重來</button>
       <span class="grow"></span>
       <button class="tool" id="btn-ar" hidden>AR 擺放</button>
+      <button class="tool" id="btn-memory-poster" hidden>整紀念海報</button>
       <button class="tool primary" id="btn-mode">預覽成品</button>
     </div>
   </section>
@@ -301,6 +330,41 @@ button:active:not(:disabled){filter:brightness(.92);}
       width:38px;height:38px;border-radius:50%;border:none;background:rgba(0,0,0,.55);color:#fff;
       font:inherit;font-size:16px;cursor:pointer;pointer-events:auto;">✕</button>
     <p id="arlive-attribution">AR: <a href="vendor/8thwall/1.0.0/LICENSE-AGREEMENT">Niantic Spatial XR Engine</a> © 2026 Niantic Spatial, Inc.（as-is，無擔保）</p>
+  </div>
+
+
+  <div id="mp-modal" hidden>
+    <div class="mp-sheet" role="dialog" aria-labelledby="mp-title-label">
+      <div class="mp-top">
+        <span class="t" id="mp-title-label">紀念海報 · 裱畫</span>
+        <button id="mp-close" title="關閉" type="button">✕</button>
+      </div>
+      <div class="mp-preview-wrap">
+        <canvas id="mp-canvas" width="1600" height="1100" aria-label="紀念海報預覽"></canvas>
+        <video id="mp-video" playsinline muted></video>
+      </div>
+      <div class="mp-fields">
+        <label class="span2">作品標題
+          <input id="mp-artwork-title" type="text" maxlength="40" placeholder="例如：窗花團花" autocomplete="off">
+        </label>
+        <label>學生姓名
+          <input id="mp-student-name" type="text" maxlength="24" placeholder="你的名字" autocomplete="name">
+        </label>
+        <label>日期
+          <input id="mp-date" type="text" maxlength="20" placeholder="年-月-日" autocomplete="off">
+        </label>
+      </div>
+      <div class="mp-actions">
+        <button class="tool" id="mp-camera" type="button">影相</button>
+        <button class="tool" id="mp-upload" type="button">上載</button>
+        <button class="tool" id="mp-snap" type="button" hidden>撳快門</button>
+        <span class="grow"></span>
+        <button class="tool primary" id="mp-download" type="button">下載</button>
+        <button class="tool" id="mp-dismiss" type="button">關閉</button>
+      </div>
+      <input id="mp-file" type="file" accept="image/*">
+      <p class="mp-hint" id="mp-hint">左邊係線上設計，右邊請影／上載實體剪紙相片。</p>
+    </div>
   </div>
 
   <div id="ar-modal" hidden>
@@ -545,6 +609,7 @@ function render(){
   $('#btn-undo').disabled = state.cuts.length === 0;
   $('#btn-clear').disabled = state.cuts.length === 0;
   $('#btn-ar').hidden = state.mode !== 'preview';
+  $('#btn-memory-poster').hidden = state.mode !== 'preview';
 }
 function rotPt(p, deg){
   const r = deg * Math.PI / 180, c = Math.cos(r), s = Math.sin(r);
@@ -561,4 +626,5 @@ function modelPt(e){
 <script src="scissors.js"></script>
 <script src="rotation-controls.js"></script>
 <script src="ar.js"></script>
+<script src="memory-poster.js"></script>
 <script src="ar-live.js"></script>
